@@ -221,72 +221,95 @@ def write_player_events_to_excel(file_path, player_events, problematic_players, 
     Adds/updates a sheet listing all players, their events, and warning reasons if they're problematic.
     """
 
-    data = []
+    book = load_workbook(file_path)
+
+    # Create sheet if missing
+    if sheet_name not in book.sheetnames:
+        sheet = book.create_sheet(sheet_name)
+        headers = ["Player", "Events", "Warnings"]
+        sheet.append(headers)
+
+    sheet = book[sheet_name]
+
+    # Clear only the data area (keep headers & formatting)
+    for row in sheet.iter_rows(min_row=2, max_col= 3):
+        for cell in row:
+            cell.value = None
+
+    # Write new data
+    current_row = 2
     for player, events in sorted(player_events.items()):
         events_str = ", ".join(sorted(events))
         if player in problematic_players:
             reasons = " ⚠️ " + " | ⚠️ ".join(problematic_players[player])
         else:
             reasons = ""
-        data.append({"Player": player, "Events": events_str, "Warnings": reasons})
+        sheet.cell(row=current_row, column=1).value = player
+        sheet.cell(row=current_row, column=2).value = events_str
+        sheet.cell(row=current_row, column=3).value = reasons
 
-    df = pd.DataFrame(data)
+        current_row += 1
 
-    book = load_workbook(file_path)
-    if sheet_name in book.sheetnames:
-        del book[sheet_name]
-        book.save(file_path)
+    book.save(file_path)
 
-    with pd.ExcelWriter(file_path, engine="openpyxl", mode="a", if_sheet_exists="new") as writer:
-        writer._book = book
-        df.to_excel(writer, index=False, sheet_name=sheet_name)
+    print(f"✅ Added players to '{sheet_name}' in {file_path}")
 
-    print(f"✅ Added '{sheet_name}' sheet with {len(df)} players to {file_path}")
-
-import pandas as pd
-from openpyxl import load_workbook
-
-def write_event_analysis_to_excel(file_path, event_correlations, elimination_data, sheet_name="Event Analysis"):
+def write_event_analysis_to_excel(file_path, event_correlations, elimination_data, event_players, sheet_name="Event Analysis"):
     """
     Adds/updates a sheet showing event collisions and elimination round info.
     """
+    
+    max_rounds = 0
+    for _, rounds in elimination_data.items():
+        max_rounds = max(max_rounds, len(rounds))
 
-    data = []
-
-    for event, collisions in event_correlations.items():
-        if event in elimination_data:
-            if isinstance(elimination_data[event], list):
-                rounds = elimination_data[event]
-            else:
-                rounds = []
-        else:
-            rounds = []
-
-        collision_text = ", ".join([f"{other} ({count})" for other, count in collisions])
-        rounds_text = ", ".join(map(str, rounds)) if rounds else ""
-
-        row = {
-            "Event": event,
-            "Collides With": collision_text,
-            "Elimination Rounds (matches)": rounds_text,
-        }
-
-        data.append(row)
-
-    df = pd.DataFrame(data)
-
-    # Load existing workbook
     book = load_workbook(file_path)
-    if sheet_name in book.sheetnames:
-        del book[sheet_name]
-        book.save(file_path)
 
-    with pd.ExcelWriter(file_path, engine="openpyxl", mode="a", if_sheet_exists="new") as writer:
-        writer._book = book
-        df.to_excel(writer, index=False, sheet_name=sheet_name)
+    # Create sheet if missing
+    if sheet_name not in book.sheetnames:
+        sheet = book.create_sheet(sheet_name)
+        headers = ["Event", "Collides With", "Player amount"] + [f"Round {i+1}" for i in range(max_rounds)]
+        sheet.append(headers)
 
-    print(f"✅ Added '{sheet_name}' sheet with {len(df)} events to {file_path}")
+    sheet = book[sheet_name]
 
+    # Clear only the data area (keep headers & formatting)
+    for row in sheet.iter_rows(min_row=2, max_col= (3 + max_rounds)):
+        for cell in row:
+            cell.value = None
+
+    # Write new data
+    current_row = 2
+    for event, collisions in event_correlations.items():
+        # Fetch rounds info
+        if event not in elimination_data or not (isinstance(elimination_data[event], list)):
+            print("‼ ERROR ‼ : the rounds for the event could not be attained")
+            break
+        rounds = elimination_data[event]
+
+        # Fetch player amount
+        player_amount = len(event_players[event])
+
+        # Event name
+        sheet.cell(row=current_row, column=1).value = event
+
+        # Collisions
+        sheet.cell(row=current_row, column=2).value = ", ".join(
+            [f"{other} ({count})" for other, count in collisions]
+        )
+
+        # Player amounts
+        sheet.cell(row=current_row, column=3).value = player_amount
+
+        # Rounds in separate cells
+        for i, match_count in enumerate(rounds, start=4):
+            sheet.cell(row=current_row, column=i).value = match_count
+
+        current_row += 1
+    
+    book.save(file_path)
+
+    print(f"✅ Added events to '{sheet_name}' sheet in {file_path}")
 
 def log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations"):
     """
@@ -329,8 +352,8 @@ if __name__ == "__main__":
     elimination_data, participants_structure = calculate_elimination_rounds(event_players)
     rule_violations = check_rule_violations(player_events)
     problematic_players = find_problematic_players(player_events, event_players, event_correlations)
-    #write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events")
-    write_event_analysis_to_excel(file_path, event_correlations, elimination_data, sheet_name="Event Analysis")
+    write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events")
+    #write_event_analysis_to_excel(file_path, event_correlations, elimination_data, event_players, sheet_name="Event Analysis")
     #log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations")
 
 
