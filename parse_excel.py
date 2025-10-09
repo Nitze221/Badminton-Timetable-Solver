@@ -1,6 +1,9 @@
 import pandas as pd
 from collections import defaultdict, Counter
 import math
+from openpyxl import load_workbook
+from datetime import datetime
+from openpyxl.utils import get_column_letter
 
 def parse_competition_excel(file_path, event_codes):
     # Read Excel (no header, since layout is irregular)
@@ -180,15 +183,155 @@ def check_rule_violations(player_events):
 
     return warnings
 
+def find_problematic_players(player_events, event_players, event_correlations):
+    problematic_players = {}
+    checked_pairs = set()  # to avoid duplicate collision reports
+    
+    # Condition 1: Players in 3+ events
+    '''
+    for player, events in player_events.items():
+        if len(events) >= 3:
+            problematic_players.setdefault(player, []).append(
+                f"Plays in {len(events)} events: {', '.join(sorted(events))}"
+            )
+    '''
+
+    # Condition 2: Sole collision cause
+    for event, collisions in event_correlations.items():
+        for other_event, _ in collisions:
+            # Normalize pair so ("MS V", "XD A") == ("XD A", "MS V")
+            pair_key = tuple(sorted([event, other_event]))
+            if pair_key in checked_pairs:
+                continue  # skip duplicate
+            checked_pairs.add(pair_key)
+
+            players_in_both = event_players.get(event, set()) & event_players.get(other_event, set())
+
+            if len(players_in_both) == 1:
+                sole_player = next(iter(players_in_both))
+                problematic_players.setdefault(sole_player, []).append(
+                    f"Sole reason {pair_key[0]} collides with {pair_key[1]}"
+                )
+
+
+    return problematic_players
+
+def write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events"):
+    """
+    Adds/updates a sheet listing all players, their events, and warning reasons if they're problematic.
+    """
+
+    data = []
+    for player, events in sorted(player_events.items()):
+        events_str = ", ".join(sorted(events))
+        if player in problematic_players:
+            reasons = " ⚠️ " + " | ⚠️ ".join(problematic_players[player])
+        else:
+            reasons = ""
+        data.append({"Player": player, "Events": events_str, "Warnings": reasons})
+
+    df = pd.DataFrame(data)
+
+    book = load_workbook(file_path)
+    if sheet_name in book.sheetnames:
+        del book[sheet_name]
+        book.save(file_path)
+
+    with pd.ExcelWriter(file_path, engine="openpyxl", mode="a", if_sheet_exists="new") as writer:
+        writer._book = book
+        df.to_excel(writer, index=False, sheet_name=sheet_name)
+
+    print(f"✅ Added '{sheet_name}' sheet with {len(df)} players to {file_path}")
+
+import pandas as pd
+from openpyxl import load_workbook
+
+def write_event_analysis_to_excel(file_path, event_correlations, elimination_data, sheet_name="Event Analysis"):
+    """
+    Adds/updates a sheet showing event collisions and elimination round info.
+    """
+
+    data = []
+
+    for event, collisions in event_correlations.items():
+        if event in elimination_data:
+            if isinstance(elimination_data[event], list):
+                rounds = elimination_data[event]
+            else:
+                rounds = []
+        else:
+            rounds = []
+
+        collision_text = ", ".join([f"{other} ({count})" for other, count in collisions])
+        rounds_text = ", ".join(map(str, rounds)) if rounds else ""
+
+        row = {
+            "Event": event,
+            "Collides With": collision_text,
+            "Elimination Rounds (matches)": rounds_text,
+        }
+
+        data.append(row)
+
+    df = pd.DataFrame(data)
+
+    # Load existing workbook
+    book = load_workbook(file_path)
+    if sheet_name in book.sheetnames:
+        del book[sheet_name]
+        book.save(file_path)
+
+    with pd.ExcelWriter(file_path, engine="openpyxl", mode="a", if_sheet_exists="new") as writer:
+        writer._book = book
+        df.to_excel(writer, index=False, sheet_name=sheet_name)
+
+    print(f"✅ Added '{sheet_name}' sheet with {len(df)} events to {file_path}")
+
+
+def log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations"):
+    """
+    Logs rule violations to a persistent sheet.
+    Keeps all previous data and adds timestamped sections.
+    """
+
+    book = load_workbook(file_path)
+
+    # Create sheet if missing
+    if sheet_name not in book.sheetnames:
+        sheet = book.create_sheet(sheet_name)
+        sheet.append(["Date/Time", "Player", "Violation"])
+    else:
+        sheet = book[sheet_name]
+
+    # Find first empty row
+    next_row = sheet.max_row + 2  # leave a blank line
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sheet.cell(row=next_row, column=1).value = f"Log entry at {timestamp}"
+    next_row += 1
+
+    # Write violations
+    for v in rule_violations:
+        player, description = v.split(":", 1) if ":" in v else ("Unknown", v)
+        sheet.cell(row=next_row, column=2).value = player.strip()
+        sheet.cell(row=next_row, column=3).value = description.strip()
+        next_row += 1
+
+    book.save(file_path)
+    print(f"✅ Appended {len(rule_violations)} rule violations to '{sheet_name}' in {file_path}")
+
 
 
 if __name__ == "__main__":
-    file_path = "./2025/Premier Elite/Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
+    file_path = "../2025/Premier Elite/Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
     elimination_data, participants_structure = calculate_elimination_rounds(event_players)
-    warnings = check_rule_violations(player_events)
+    rule_violations = check_rule_violations(player_events)
+    problematic_players = find_problematic_players(player_events, event_players, event_correlations)
+    #write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events")
+    write_event_analysis_to_excel(file_path, event_correlations, elimination_data, sheet_name="Event Analysis")
+    #log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations")
 
 
     # Print all players for all events
@@ -240,3 +383,23 @@ if __name__ == "__main__":
     for warning in warnings:
         print(warning)
     '''
+    # Print summary
+    '''
+    print("\n=== Problematic Players ===")
+    if not problematic_players:
+        print("✅ No problematic players found.")
+    else:
+        for player, reasons in problematic_players.items():
+            print(f"⚠️ {player}:")
+            for reason in reasons:
+                print(f"   - {reason}")
+    '''
+
+
+
+# Change so that the it does not delete the sheets, 
+# only writes over them (not in the case of the rule violations) 
+# and that it does not touch any cells that it does not have to
+# AND changes no formatting, only text.
+
+# change the event data sheet so that it prints each round in it's own cell
