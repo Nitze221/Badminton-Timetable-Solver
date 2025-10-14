@@ -384,7 +384,13 @@ def minizinc_data(print_lists = True):
     # 2d list where index is class and element is list of matches (size = rounds)
     elimination_data_minizinc = [i[1] for i in elimination_data.items()]
 
-    num_matches = sum(map(sum,elimination_data_minizinc))
+    event_number_dict = {i[1]: i[0] for i in enumerate(elimination_data.keys())}
+    event_to_number = lambda x: event_number_dict[x] + 1
+
+    # collisions paired up
+    strong_collision_minizinc = [item for i, (_, values) in enumerate(strong_collision.items())
+        for v in values
+        for item in (i + 1, event_to_number(v))]
 
 
     matches_minizic = []
@@ -411,9 +417,10 @@ def minizinc_data(print_lists = True):
         print(round_index, end='\n\n')
         print("MATCHES:")
         print(matches_minizic, end='\n\n')
+        print(strong_collision_minizinc, end='\n\n')
 
     data = {
-        "strong_collision": strong_collision,
+        "strong_collision": strong_collision_minizinc,
         "weak_collision": weak_collision,
         "matches": matches_minizic,
         "class_index": class_index,
