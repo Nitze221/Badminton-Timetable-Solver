@@ -26,6 +26,7 @@ instance = minizinc.Instance(gecode, model)
 instance["nof_matches"] = len(data["matches"])
 instance["nof_classes"] = len(data["class_index"])
 instance["nof_rounds"] = len(data["round_index"])
+instance["nof_strong_collisions"] = len(data["strong_collision"])
 
 instance["class_index"] = data["class_index"]
 instance["round_index"] = data["round_index"]
@@ -34,8 +35,10 @@ instance["timeslots"] = data["timeslots"]
 instance["fields"] = data["fields"]
 instance["matchslots"] = data["matchslots"]
 
+instance["strong_collision"] = data["strong_collision"]
+
 # Solve
 result = instance.solve(nr_solutions=1)
 
 # Access output
-print(result["matches"])
+print(result)
