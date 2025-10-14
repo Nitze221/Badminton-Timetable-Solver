@@ -365,25 +365,24 @@ def half_hour_slots(start_datetime: str, end_datetime: str):
     
     return count
 
-def minizinc_data():
+def minizinc_data(print_lists = True):
 
     file_path = "../Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
     elimination_data, participants_structure = calculate_elimination_rounds(event_players)
+    day_one = half_hour_slots("2025-10-10 09:00", "2025-10-10 21:00")
+    day_two = half_hour_slots("2025-10-10 09:00", "2025-10-10 17:30")
 
-    event_number_dict = {i[1]: i[0] for i in enumerate(elimination_data.keys())}
-    print(event_number_dict)
-
-    event_to_number = lambda x: event_number_dict[x]
-
-    print(elimination_data)
+    # Matchslots can be made in a similar way as matches in the future if there is a varying amount of fields per timeslot.
+    # for now assume constant amount of fields
+    timeslots = day_one + day_two
+    fields = 10
+    matchslots = timeslots * fields
 
     # 2d list where index is class and element is list of matches (size = rounds)
     elimination_data_minizinc = [i[1] for i in elimination_data.items()]
-    print()
-    print(elimination_data_minizinc)
 
     num_matches = sum(map(sum,elimination_data_minizinc))
 
@@ -392,7 +391,7 @@ def minizinc_data():
     class_index = []
     round_index = []
 
-    count = 0
+    count = 1
     for outer in elimination_data_minizinc:
         class_index.append(count)
         for inner in outer:
@@ -400,17 +399,23 @@ def minizinc_data():
             for _ in range(0, inner):
                 matches_minizic.append(count)
                 count += 1
-    print()
-    print(class_index)
-    print(round_index)
-    print(matches_minizic)
+    
+    if print_lists:
+        print(timeslots, end='\n\n')
+        print(elimination_data_minizinc, end='\n\n')
+        print(class_index, end='\n\n')
+        print(round_index, end='\n\n')
+        print(matches_minizic, end='\n\n')
 
     data = {
         "strong_collision": strong_collision,
         "weak_collision": weak_collision,
         "matches": matches_minizic,
         "class_index": class_index,
-        "round_index": round_index
+        "round_index": round_index,
+        "timeslots": timeslots,
+        "fields": fields,
+        "matchslots": matchslots
     }
 
     return data
