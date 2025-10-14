@@ -2,7 +2,7 @@ import pandas as pd
 from collections import defaultdict, Counter
 import math
 from openpyxl import load_workbook
-from datetime import datetime
+from datetime import datetime, timedelta
 from openpyxl.utils import get_column_letter
 
 def parse_competition_excel(file_path, event_codes):
@@ -342,6 +342,28 @@ def log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Vi
     book.save(file_path)
     print(f"✅ Appended {len(rule_violations)} rule violations to '{sheet_name}' in {file_path}")
 
+def half_hour_slots(start_datetime: str, end_datetime: str):
+    """
+    Calculates how many 30-minute slots fit between two times (HH:MM format).
+    Returns an integer count.
+    """
+    datetime_format = "%Y-%m-%d %H:%M"
+    start = datetime.strptime(start_datetime, datetime_format)
+    end = datetime.strptime(end_datetime, datetime_format)
+    
+    if end <= start:
+        raise ValueError("End time must be after start time.")
+    
+    # Calculate total minutes difference
+    slot_length = timedelta(minutes=30)
+    
+    count = 0
+    current = start
+    while current <= end:
+        count += 1
+        current += slot_length
+    
+    return count
 
 
 if __name__ == "__main__":
@@ -352,10 +374,13 @@ if __name__ == "__main__":
     elimination_data, participants_structure = calculate_elimination_rounds(event_players)
     rule_violations = check_rule_violations(player_events)
     problematic_players = find_problematic_players(player_events, event_players, event_correlations)
-    write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events")
+    #write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events")
     #write_event_analysis_to_excel(file_path, event_correlations, elimination_data, event_players, sheet_name="Event Analysis")
     #log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations")
+    time_slots = half_hour_slots("2025-10-10 09:00", "2025-10-10 13:30")
+    
 
+    #print(str(time_slots))
 
     # Print all players for all events
     '''
@@ -417,12 +442,3 @@ if __name__ == "__main__":
             for reason in reasons:
                 print(f"   - {reason}")
     '''
-
-
-
-# Change so that the it does not delete the sheets, 
-# only writes over them (not in the case of the rule violations) 
-# and that it does not touch any cells that it does not have to
-# AND changes no formatting, only text.
-
-# change the event data sheet so that it prints each round in it's own cell
