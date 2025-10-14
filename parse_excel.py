@@ -367,7 +367,7 @@ def half_hour_slots(start_datetime: str, end_datetime: str):
 
 def minizinc_data(print_lists = True):
 
-    file_path = "../Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
+    file_path = "Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
@@ -415,10 +415,15 @@ def minizinc_data(print_lists = True):
                 count += 1
     
     if print_lists:
+        print("TIMESLOTS:")
         print(timeslots, end='\n\n')
+        print("ELIMINATION DATA:")
         print(elimination_data_minizinc, end='\n\n')
+        print("CLASS INDEXES:")
         print(class_index, end='\n\n')
+        print("ROUND INDEXES:")
         print(round_index, end='\n\n')
+        print("MATCHES:")
         print(matches_minizic, end='\n\n')
         print(strong_collision_minizinc, end='\n\n')
 
@@ -431,13 +436,14 @@ def minizinc_data(print_lists = True):
         "timeslots": timeslots,
         "fields": fields,
         "matchslots": matchslots,
-        "last_of_day1": last_of_day1
+        "last_of_day1": last_of_day1,
+        "file_path": file_path
     }
 
     return data
 
 def main():
-    file_path = "../Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
+    file_path = "Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
