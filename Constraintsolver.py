@@ -27,6 +27,7 @@ instance["nof_matches"] = len(data["matches"])
 instance["nof_classes"] = len(data["class_index"])
 instance["nof_rounds"] = len(data["round_index"])
 instance["nof_strong_collisions"] = len(data["strong_collision"])
+instance["nof_weak_collisions"] = len(data["weak_collision"])
 
 instance["class_index"] = data["class_index"]
 instance["round_index"] = data["round_index"]
@@ -36,9 +37,11 @@ instance["fields"] = data["fields"]
 instance["matchslots"] = data["matchslots"]
 
 instance["strong_collision"] = data["strong_collision"]
+instance["weak_collision"] = data["weak_collision"]
+instance["last_of_day1"] = data["last_of_day1"]
 
 # Solve
-result = instance.solve(nr_solutions=1)
-
+result = instance.solve(statistics=True, verbose=True)
+instance
 # Access output
 print(result)

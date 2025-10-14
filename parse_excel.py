@@ -380,6 +380,7 @@ def minizinc_data(print_lists = True):
     timeslots = day_one + day_two
     fields = 10
     matchslots = timeslots * fields
+    last_of_day1 = day_one * fields
 
     # 2d list where index is class and element is list of matches (size = rounds)
     elimination_data_minizinc = [i[1] for i in elimination_data.items()]
@@ -391,7 +392,14 @@ def minizinc_data(print_lists = True):
     strong_collision_minizinc = [item for i, (_, values) in enumerate(strong_collision.items())
         for v in values
         for item in (i + 1, event_to_number(v))]
+    
+    print(weak_collision)
 
+    weak_collision_minizinc = [item for i, (_, values) in enumerate(weak_collision.items())
+        for v in values
+        for item in (i + 1, event_to_number(v[0]))]
+
+    print(weak_collision_minizinc)
 
     matches_minizic = []
     class_index = []
@@ -416,13 +424,14 @@ def minizinc_data(print_lists = True):
 
     data = {
         "strong_collision": strong_collision_minizinc,
-        "weak_collision": weak_collision,
+        "weak_collision": weak_collision_minizinc,
         "matches": matches_minizic,
         "class_index": class_index,
         "round_index": round_index,
         "timeslots": timeslots,
         "fields": fields,
-        "matchslots": matchslots
+        "matchslots": matchslots,
+        "last_of_day1": last_of_day1
     }
 
     return data
