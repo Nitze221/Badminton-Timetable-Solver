@@ -164,7 +164,10 @@ def write_schedule_to_excel(file_path, schedule, colors, sheet_name="timetable",
         sheet = book.create_sheet(sheet_name)
 
     # Mapping class prefix -> color
-    class_color_map = {}
+    class_color_map = {
+        key: PatternFill(start_color=value, end_color=value, fill_type="solid")
+        for key, value in colors.items()
+    }
 
     # Write the schedule
     # Transpose so each time slot is a column
@@ -181,24 +184,30 @@ def write_schedule_to_excel(file_path, schedule, colors, sheet_name="timetable",
             class_prefix = match[:4]
 
             # Assign color if not yet assigned
-            if class_prefix not in class_color_map:
-                color_idx = len(class_color_map) % len(colors)
-                class_color_map[class_prefix] = PatternFill(start_color=colors[color_idx],
-                                                            end_color=colors[color_idx],
-                                                            fill_type="solid")
+            #if class_prefix not in class_color_map:
+             #   color_idx = len(class_color_map) % len(colors)
+              #  class_color_map[class_prefix] = PatternFill(start_color=colors[color_idx],
+               #                                             end_color=colors[color_idx],
+                #                                            fill_type="solid")
             # Apply fill
             cell.fill = class_color_map[class_prefix]
+            if class_prefix in class_color_map:
+                cell.fill = class_color_map[class_prefix]
 
     # Save workbook
     book.save(file_path)
 
 
 
-colors = [
-        "FFC7CE", "FFEB9C", "C6EFCE", "9BC2E6", "D9D2E9",
-        "F4B084", "BDD7EE", "FCE4D6", "D9D2C9", "F8CBAD",
-        "E2EFDA", "FCE4D6", "D9EAD3", "F4CCCC", "C9DAF8",
-        "FCE4D6", "FFE699", "D9E1F2", "EAD1DC", "E2EFDA"
-    ]
+colors = {
+    # Blues
+    "MS V" : "E3F2FD", "WS V" : "BBDEFB", "MD V" : "90CAF9", "WD V" : "64B5F6", "XD V" : "42A5F5",
+    # Greens
+    "MS A" : "E8F5E9", "WS A" : "C8E6C9", "MD A" : "A5D6A7", "WD A" : "81C784", "XD A" : "66BB6A",
+    # Reds/Pinks
+    "MS B" : "FDE0E0", "WS B" : "F8BBD0", "MD B" : "F48FB1", "WD B" : "F06292", "XD B" : "EC407A",
+    # Yellows/Oranges
+    "MS C" : "FFF8E1", "WS C" : "FFECB3", "MD C" : "FFE082", "WD C" : "FFD54F", "XD C" : "FFCA28"
+}
 
 write_schedule_to_excel(data["file_path"], schedule, colors)
