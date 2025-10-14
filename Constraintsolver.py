@@ -41,7 +41,7 @@ instance["weak_collision"] = data["weak_collision"]
 instance["last_of_day1"] = data["last_of_day1"]
 
 # Solve
-result = instance.solve(statistics=True, verbose=True)
+result = instance.solve(nr_solutions=1)
 instance
 # Access output
 print("RESULT:")
@@ -112,7 +112,7 @@ def build_schedule(class_index, round_index, matches, class_names):
     # Go through each match
     for match_index, time_slot in enumerate(matches):
         # Find current count for this slot
-        group_slot = time_slot // 10  # group every 10 slots together
+        group_slot = (time_slot - 1) // 10  # group every 10 slots together
         count = slot_counts[group_slot]
         
         match_index_plus_one = match_index + 1     # since matches index starts with 1
