@@ -365,9 +365,58 @@ def half_hour_slots(start_datetime: str, end_datetime: str):
     
     return count
 
+def minizinc_data():
 
-if __name__ == "__main__":
-    file_path = "../2025/Premier Elite/Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
+    file_path = "../Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
+    event_codes = {"W", "M", "X"}
+    event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
+    strong_collision, weak_collision = analyze_collisions(event_correlations)
+    elimination_data, participants_structure = calculate_elimination_rounds(event_players)
+
+    event_number_dict = {i[1]: i[0] for i in enumerate(elimination_data.keys())}
+    print(event_number_dict)
+
+    event_to_number = lambda x: event_number_dict[x]
+
+    print(elimination_data)
+
+    # 2d list where index is class and element is list of matches (size = rounds)
+    elimination_data_minizinc = [i[1] for i in elimination_data.items()]
+    print()
+    print(elimination_data_minizinc)
+
+    num_matches = sum(map(sum,elimination_data_minizinc))
+
+
+    matches_minizic = []
+    class_index = []
+    round_index = []
+
+    count = 0
+    for outer in elimination_data_minizinc:
+        class_index.append(count)
+        for inner in outer:
+            round_index.append(count)
+            for _ in range(0, inner):
+                matches_minizic.append(count)
+                count += 1
+    print()
+    print(class_index)
+    print(round_index)
+    print(matches_minizic)
+
+    data = {
+        "strong_collision": strong_collision,
+        "weak_collision": weak_collision,
+        "matches": matches_minizic,
+        "class_index": class_index,
+        "round_index": round_index
+    }
+
+    return data
+
+def main():
+    file_path = "../Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
@@ -409,26 +458,26 @@ if __name__ == "__main__":
             print(f"  {other_event}: {count}")
     '''
     # Print strong collisions for an event
-    '''
+    
     print("\n=== Events colliding with same last character ===")
     for event, others in strong_collision.items():
         print(f"{event}: {others}")
-    '''
+    
     # Print weak collitions for an event (with wight)
-    '''
+    
     print("\n=== Events colliding with different last character (with counts) ===")
     for event, others in weak_collision.items():
         print(f"{event}: {others}")
-    '''
+    
     # Print mathces per elimination round per event
-    '''
+    
     print("\n=== Elimination rounds and matches per round ===")
     for event, rounds in elimination_data.items():
         print(f"{event}: {rounds}")
-    '''
+    
     # Print warnings related to players entries
     '''
-    for warning in warnings:
+    for warning in rule_violations:
         print(warning)
     '''
     # Print summary
@@ -442,3 +491,6 @@ if __name__ == "__main__":
             for reason in reasons:
                 print(f"   - {reason}")
     '''
+
+if __name__ == "__main__":
+    minizinc_data()
