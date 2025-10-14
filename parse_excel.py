@@ -401,10 +401,15 @@ def minizinc_data(print_lists = True):
                 count += 1
     
     if print_lists:
+        print("TIMESLOTS:")
         print(timeslots, end='\n\n')
+        print("ELIMINATION DATA:")
         print(elimination_data_minizinc, end='\n\n')
+        print("CLASS INDEXES:")
         print(class_index, end='\n\n')
+        print("ROUND INDEXES:")
         print(round_index, end='\n\n')
+        print("MATCHES:")
         print(matches_minizic, end='\n\n')
 
     data = {
@@ -415,7 +420,8 @@ def minizinc_data(print_lists = True):
         "round_index": round_index,
         "timeslots": timeslots,
         "fields": fields,
-        "matchslots": matchslots
+        "matchslots": matchslots,
+        "file_path": file_path
     }
 
     return data
