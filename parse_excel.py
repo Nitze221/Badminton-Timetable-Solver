@@ -367,7 +367,7 @@ def half_hour_slots(start_datetime: str, end_datetime: str):
 
 def minizinc_data(print_lists = True):
 
-    file_path = "../Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
+    file_path = "Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
@@ -421,7 +421,7 @@ def minizinc_data(print_lists = True):
     return data
 
 def main():
-    file_path = "../Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
+    file_path = "Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
