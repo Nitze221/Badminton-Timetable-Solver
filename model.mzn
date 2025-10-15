@@ -3,6 +3,7 @@ include "alldifferent.mzn";
 int: nof_classes;
 int: nof_rounds;
 int: nof_matches;
+int: nof_umpire_matches;
 int: timeslots;
 int: fields;
 int: matchslots;
@@ -13,6 +14,7 @@ int: last_of_day1;
 array[1..nof_classes] of int: class_index;
 array[1..nof_rounds] of int: round_index;
 array[1..nof_matches] of var 1..matchslots: matches;
+set of int: umpire_matches;
 array[1..nof_strong_collisions] of int: strong_collision;
 array[1..nof_weak_collisions] of int: weak_collision;
 
@@ -70,13 +72,13 @@ array[1..nof_matches] of var 1..fields: field_of_match =
     [ (matches[i] - 1) mod fields + 1 | i in 1..nof_matches ];
 
 
-%constraint forall(t in 1..timeslots)(
- %   alldifferent([ field_of_match[i] | i in 1..nof_matches where time_of_match[i] == t ])
-%);
+constraint forall(t in 1..timeslots)(
+    alldifferent([ field_of_match[i] | i in 1..nof_matches where time_of_match[i] == t ])
+);
 
 % all matches have an available timeslot
 
-constraint alldifferent(matches);
+%constraint alldifferent(matches);
 
 % All rounds in all classes are played in order
 % Aka. Within a class, a match in a round with a higher index must have a higher matchslot number
@@ -103,12 +105,26 @@ constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == cl
 
 %constraint
 
+% There can only be 4 umpire matches per timeslot
+constraint 
+    forall (ts in 1..timeslots) (
+        card({matches[um] | um in umpire_matches where ((matches[um] - 1) div fields) == ts}) <= 4
+    );
 
+% umpire matches must have atleast 1 timeslot inbetween, all umpire matches are either in same timeslot or have a gap of >= 1 timeslot between them
+constraint
+    forall (m1, m2 in umpire_matches where m1 < m2) (
+        abs(((matches[m1] - 1) div fields) - ((matches[m2] - 1) div fields)) != 1
+    );
+
+
+% consecutive rounds in a class must have atleast 1 timeslot inbetween
 constraint 
     forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
         abs(min([ matches[i] | i in matches_in_round[r+1] ]) - max([ matches[i] | i in matches_in_round[r] ])) >= 2 * fields
     );
 
+% matches must be played within 1 or 2 rounds
 constraint 
     forall(c in 1..nof_classes, r in 1..nof_rounds) (
         %abs(max([ matches[i] | i in matches_in_round[r] ]) - min([ matches[i] | i in matches_in_round[r] ])) < 2 * fields
