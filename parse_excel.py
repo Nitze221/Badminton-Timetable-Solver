@@ -367,7 +367,7 @@ def half_hour_slots(start_datetime: str, end_datetime: str):
 
 def minizinc_data(print_lists = True):
 
-    file_path = "Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
+    file_path = "Entries HBC Premier Elite 2024 copy.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
@@ -454,16 +454,16 @@ def minizinc_data(print_lists = True):
     return data
 
 def main():
-    file_path = "Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
+    file_path = "Entries HBC Premier Elite 2024 copy.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
     elimination_data, participants_structure = calculate_elimination_rounds(event_players)
     rule_violations = check_rule_violations(player_events)
     problematic_players = find_problematic_players(player_events, event_players, event_correlations)
-    #write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events")
-    #write_event_analysis_to_excel(file_path, event_correlations, elimination_data, event_players, sheet_name="Event Analysis")
-    #log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations")
+    write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events")
+    write_event_analysis_to_excel(file_path, event_correlations, elimination_data, event_players, sheet_name="Event Analysis")
+    log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations")
     time_slots = half_hour_slots("2025-10-10 09:00", "2025-10-10 13:30")
     
 
@@ -531,4 +531,5 @@ def main():
     '''
 
 if __name__ == "__main__":
-    minizinc_data()
+    #minizinc_data()
+    main()

@@ -35,6 +35,7 @@ array[1..nof_matches] of int: class_of_match =
 array[1..nof_matches] of int: round_of_match = 
     [min([i | i in 1..nof_rounds where in_round(j, i)]) | j in 1..nof_matches];
 
+% Returns all matches in a class
 array[1..nof_classes] of set of int: matches_in_class =
     [ if c < nof_classes then
           class_index[c] .. class_index[c+1] - 1
@@ -44,6 +45,7 @@ array[1..nof_classes] of set of int: matches_in_class =
       | c in 1..nof_classes
     ];
 
+% Returns all matches in a round
 array[1..nof_rounds] of set of int: matches_in_round =
     [ if r < nof_rounds then
           round_index[r] .. round_index[r+1] - 1
@@ -78,13 +80,13 @@ constraint forall(t in 1..timeslots)(
 
 % All rounds in all classes are played in order
 % Aka. Within a class, a match in a round with a higher index must have a higher matchslot number
-% constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (matches[i] < matches[j]);
+constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (matches[i] < matches[j]);
 
-constraint 
-    forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        max([ matches[i] | i in matches_in_round[r] ]) <
-        min([ matches[i] | i in matches_in_round[r+1] ])
-    );
+%constraint 
+ %   forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
+  %      max([ matches[i] | i in matches_in_round[r] ]) <
+   %     min([ matches[i] | i in matches_in_round[r+1] ])
+    %);
 
 
 % All rounds in a class must have atleast 2 timeslots inbetween them: slot_diff >= 20
@@ -94,29 +96,27 @@ constraint
 %    );
 
 %constraint
-%  forall(i in 1..nof_classes,
-%         j, k in matches_in_class[i] where j < k) (
-%    (round_of_match[j] != round_of_match[k]) = (abs(((matches[j] - 1) div fields) - ((matches[k] - 1) div fields)) >= 2)
-%  );
+
 
 constraint 
     forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        abs(max([ matches[i] | i in matches_in_round[r] ]) - min([ matches[i] | i in matches_in_round[r+1] ])) >= 2 * fields
+        abs(min([ matches[i] | i in matches_in_round[r+1] ]) - max([ matches[i] | i in matches_in_round[r] ])) >= 2 * fields
     );
 
 constraint 
     forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        abs(max([ matches[i] | i in matches_in_round[r] ]) - min([ matches[i] | i in matches_in_round[r] ])) < 2 * fields
+        %abs(max([ matches[i] | i in matches_in_round[r] ]) - min([ matches[i] | i in matches_in_round[r] ])) < 2 * fields
+        abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 2
     );
 
 % Rundor i kolliderande klasser som inte hör till samma nivå får inte spelas på samma tidsslot
-%constraint
-%    forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
-%        forall(c1 in matches_in_class(strong_collision[i]),
-%               c2 in matches_in_class(strong_collision[i+1])) (
-%            abs(((matches[c1] - 1) div fields) - ((matches[c2] - 1) div fields)) >= 1
-%       )
-%    );
+constraint
+    forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
+        forall(c1 in matches_in_class[strong_collision[i]],
+               c2 in matches_in_class[strong_collision[i+1]]) (
+            abs(((matches[c1] - 1) div fields) - ((matches[c2] - 1) div fields)) >= 1
+       )
+    );
 
 % weak collision
 %constraint
