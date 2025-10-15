@@ -31,9 +31,12 @@ function bool: in_round(int: match, int: iround) =
 array[1..nof_matches] of int: class_of_match = 
     [min([i | i in 1..nof_classes where in_class(j, i)]) | j in 1..nof_matches];
 
+% Return the round of a match
 array[1..nof_matches] of int: round_of_match = 
     [min([i | i in 1..nof_rounds where in_round(j, i)]) | j in 1..nof_matches];
 
+
+% Return the amount of matches in a class
 function set of int: matches_in_class(int: c) =
     if c < nof_classes then
         class_index[c] .. class_index[c+1] - 1
@@ -41,6 +44,7 @@ function set of int: matches_in_class(int: c) =
         class_index[c] .. nof_matches
     endif;
 
+% Return the matches in a round
 function set of int: matches_in_round(int: r) =
     if r < nof_rounds then
         round_index[r] .. round_index[r+1] - 1
@@ -48,6 +52,7 @@ function set of int: matches_in_round(int: r) =
         round_index[r] .. nof_matches
     endif;
 
+% TRUE if the match is a semifinal or final
 function bool: is_semi_or_final(int: match, int: class) =
     if class < nof_classes then
         match >= class_index[class + 1] - 3 /\ match < class_index[class + 1]

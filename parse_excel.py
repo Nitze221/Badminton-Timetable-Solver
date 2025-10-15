@@ -401,13 +401,15 @@ def minizinc_data(print_lists = True):
                 seen_pairs.add(key)
                 strong_collision_minizinc.extend([a, b])
     
-    print(weak_collision)
+    print("WEAK COLLISION:")
+    print(weak_collision, end="\n\n")
 
     weak_collision_minizinc = [item for i, (_, values) in enumerate(weak_collision.items())
         for v in values
         for item in (i + 1, event_to_number(v[0]))]
 
-    print(weak_collision_minizinc)
+    print("WEAK COLLISION MINIZINC:")
+    print(weak_collision_minizinc, end="\n\n")
 
     matches_minizic = []
     class_index = []
@@ -433,6 +435,7 @@ def minizinc_data(print_lists = True):
         print(round_index, end='\n\n')
         print("MATCHES:")
         print(matches_minizic, end='\n\n')
+        print("STRONG COLLISION MINIZINC:")
         print(strong_collision_minizinc, end='\n\n')
 
     data = {
