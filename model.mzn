@@ -70,23 +70,23 @@ array[1..nof_matches] of var 1..fields: field_of_match =
     [ (matches[i] - 1) mod fields + 1 | i in 1..nof_matches ];
 
 
-constraint forall(t in 1..timeslots)(
-    alldifferent([ field_of_match[i] | i in 1..nof_matches where time_of_match[i] == t ])
-);
+%constraint forall(t in 1..timeslots)(
+ %   alldifferent([ field_of_match[i] | i in 1..nof_matches where time_of_match[i] == t ])
+%);
 
 % all matches have an available timeslot
 
-% constraint alldifferent(matches);
+constraint alldifferent(matches);
 
 % All rounds in all classes are played in order
 % Aka. Within a class, a match in a round with a higher index must have a higher matchslot number
-% constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (matches[i] < matches[j]);
+constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (matches[i] < matches[j]);
 
-constraint forall (c in 1..nof_classes) (
-    forall (i in 1..(card(matches_in_class[c]) - 1)) (
-        matches[i] < matches[i + 1]
-    )
-);
+%constraint forall (c in 1..nof_classes) (
+ %   forall (i in 1..(card(matches_in_class[c]) - 1)) (
+  %      matches[i] < matches[i + 1]
+   % )
+%);
 
 %constraint 
  %   forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
@@ -145,9 +145,18 @@ constraint
 %    );
 
 % All semi-finals and finals on day 2
-%constraint 
-%    forall (i in 1..nof_matches where is_semi_or_final(i, class_of_match[i])) (
-%        matches[i] > last_of_day1
-%    );
+constraint 
+    forall (i in 1..nof_matches where is_semi_or_final(i, class_of_match[i])) (
+        matches[i] > last_of_day1
+    );
 
 % solve :: int_search(matches, first_fail, indomain_min, complete) satisfy;
+
+% Block any round from beeing split between two days
+constraint
+    (forall(r in 1..nof_rounds)(
+        forall(m in matches_in_round[r])(m <= last_of_day1)
+    \/
+        forall(m in matches_in_round[r])(m > last_of_day1)
+    ));
+
