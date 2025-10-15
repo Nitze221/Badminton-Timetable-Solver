@@ -41,7 +41,7 @@ instance["weak_collision"] = data["weak_collision"]
 instance["last_of_day1"] = data["last_of_day1"]
 
 # Solve
-result = instance.solve(nr_solutions=1, processes=4, optimisation_level=4)
+result = instance.solve(nr_solutions=1, processes=1, optimisation_level=1)
 instance
 # Access output
 print("RESULT:")
