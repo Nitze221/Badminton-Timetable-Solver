@@ -12,9 +12,12 @@ int: last_of_day1;
 
 array[1..nof_classes] of int: class_index;
 array[1..nof_rounds] of int: round_index;
-array[1..nof_matches] of var int: matches;
+array[1..nof_matches] of var 1..matchslots: matches;
 array[1..nof_strong_collisions] of int: strong_collision;
 array[1..nof_weak_collisions] of int: weak_collision;
+
+%array[1..nof_matches] of var 1..timeslots: match_time;
+%array[1..nof_matches] of var 1..fields: match_field;
 
 % check if a match is in a class
 function bool: in_class(int: match, int: class) = 
@@ -38,6 +41,13 @@ function set of int: matches_in_class(int: c) =
         class_index[c] .. nof_matches
     endif;
 
+function set of int: matches_in_round(int: r) =
+    if r < nof_rounds then
+        round_index[r] .. round_index[r+1] - 1
+    else
+        round_index[r] .. nof_matches
+    endif;
+
 function bool: is_semi_or_final(int: match, int: class) =
     if class < nof_classes then
         match >= class_index[class + 1] - 3 /\ match < class_index[class + 1]
@@ -46,29 +56,47 @@ function bool: is_semi_or_final(int: match, int: class) =
     endif;
 
 
-% No matches at the same time on the same field
-constraint alldifferent(matches);
+%constraint
+%   forall(i, j in 1..nof_matches where i < j) (
+%       (match_time[i] != match_time[j]) \/ (match_field[i] != match_field[j])
+%    );
 
 % all matches have an available timeslot
-constraint forall (i in 1..nof_matches) (matches[i] >= 1 /\ matches[i] <= matchslots);
+
+constraint alldifferent(matches);
 
 % All rounds in all classes are played in order
 % Aka. Within a class, a match in a round with a higher index must have a higher matchslot number
-constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (matches[i] < matches[j]);
+% constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (matches[i] < matches[j]);
+
+constraint forall(c in 1..nof_classes, r in 1..nof_rounds - 1) (
+    forall(i in matches_in_round(r),
+           j in matches_in_round(r + 1) 
+           where class_of_match[i] == c /\ class_of_match[j] == c) (
+        matches[i] < matches[j]
+    )
+);
+
 
 % All rounds in a class must have atleast 2 timeslots inbetween them: slot_diff >= 20
 % Also checks that matches in same round is within 2 timeslots (= denotes logical equivalence)
-constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (
-        (round_of_match[i] != round_of_match[j]) = (abs((matches[i] div fields) - (matches[j] div fields)) >= 2)
-    );
+%constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (
+%       (round_of_match[i] != round_of_match[j]) = (abs(match_time[i] - match_time[j]) >= 2)
+%    );
+
+constraint
+  forall(i in 1..nof_classes,
+         j, k in matches_in_class(i) where j < k) (
+    (round_of_match[j] != round_of_match[k]) = (abs(((matches[j] - 1) div fields) - ((matches[k] - 1) div fields)) >= 2)
+  );
 
 % Rundor i kolliderande klasser som inte hör till samma nivå får inte spelas på samma tidsslot
 constraint
     forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
         forall(c1 in matches_in_class(strong_collision[i]),
                c2 in matches_in_class(strong_collision[i+1])) (
-            abs((matches[c1] div fields) - (matches[c2] div fields)) >= 1
-        )
+            abs(((matches[c1] - 1) div fields) - ((matches[c2] - 1) div fields)) >= 1
+       )
     );
 
 % weak collision
@@ -85,3 +113,5 @@ constraint
 %    forall (i in 1..nof_matches where is_semi_or_final(i, class_of_match[i])) (
 %        matches[i] > last_of_day1
 %    );
+
+% solve :: int_search(matches, first_fail, indomain_min, complete) satisfy;

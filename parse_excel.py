@@ -389,9 +389,17 @@ def minizinc_data(print_lists = True):
     event_to_number = lambda x: event_number_dict[x] + 1
 
     # collisions paired up
-    strong_collision_minizinc = [item for i, (_, values) in enumerate(strong_collision.items())
-        for v in values
-        for item in (i + 1, event_to_number(v))]
+    seen_pairs = set()
+    strong_collision_minizinc = []
+
+    for i, (_, values) in enumerate(strong_collision.items()):
+        for v in values:
+            a = i + 1
+            b = event_to_number(v)
+            key = tuple(sorted((a, b)))  # Ensure (1,2) and (2,1) are treated the same
+            if key not in seen_pairs:
+                seen_pairs.add(key)
+                strong_collision_minizinc.extend([a, b])
     
     print(weak_collision)
 
