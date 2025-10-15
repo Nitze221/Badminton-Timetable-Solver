@@ -48,6 +48,10 @@ def parse_competition_excel(file_path, event_codes):
 
             if str(col_d).strip().lower() == "[withdrawn]":
                 continue
+            if "[withdrawn]" in str(col_d).strip().lower():
+                current_player = None
+                print("\nWithdrawn found!\n")
+                continue
 
             event_code = str(col_d)[:4].strip()
             if event_code and event_code[0].upper() in event_codes:
@@ -367,13 +371,13 @@ def half_hour_slots(start_datetime: str, end_datetime: str):
 
 def minizinc_data(print_lists = True):
 
-    file_path = "Entries HBC Premier Elite 2024 copy.xlsx"  # <-- your Excel file
+    file_path = "Entries HBC Premier Elite 2024.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
     elimination_data, participants_structure = calculate_elimination_rounds(event_players)
-    day_one = half_hour_slots("2025-10-10 09:00", "2025-10-10 21:00")
-    day_two = half_hour_slots("2025-10-10 09:00", "2025-10-10 17:30")
+    day_one = half_hour_slots("2025-10-10 09:00", "2025-10-10 23:30")
+    day_two = half_hour_slots("2025-10-10 09:00", "2025-10-10 23:30")
 
     # Matchslots can be made in a similar way as matches in the future if there is a varying amount of fields per timeslot.
     # for now assume constant amount of fields
@@ -454,7 +458,7 @@ def minizinc_data(print_lists = True):
     return data
 
 def main():
-    file_path = "Entries HBC Premier Elite 2024 copy.xlsx"  # <-- your Excel file
+    file_path = "Entries 15.10.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
@@ -496,23 +500,23 @@ def main():
             print(f"  {other_event}: {count}")
     '''
     # Print strong collisions for an event
-    
+    '''
     print("\n=== Events colliding with same last character ===")
     for event, others in strong_collision.items():
         print(f"{event}: {others}")
-    
+    '''
     # Print weak collitions for an event (with wight)
-    
+    '''
     print("\n=== Events colliding with different last character (with counts) ===")
     for event, others in weak_collision.items():
         print(f"{event}: {others}")
-    
+    '''
     # Print mathces per elimination round per event
-    
+    '''
     print("\n=== Elimination rounds and matches per round ===")
     for event, rounds in elimination_data.items():
         print(f"{event}: {rounds}")
-    
+    '''
     # Print warnings related to players entries
     '''
     for warning in rule_violations:

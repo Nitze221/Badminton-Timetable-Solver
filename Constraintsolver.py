@@ -100,7 +100,7 @@ def find_round(match_index, class_index, round_index):
 
 def build_schedule(class_index, round_index, matches, class_names):
     # Find how many time slots exist
-    num_groups = 43  # assuming time slots start at 0
+    num_groups = data["timeslots"]  # assuming time slots start at 0
 
     # Initialize 2D list of None values (each slot has 10 possible matches)
     schedule = [[None for _ in range(data["fields"])] for _ in range(num_groups)]
