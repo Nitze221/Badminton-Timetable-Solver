@@ -413,6 +413,7 @@ def minizinc_data(print_lists = True):
 
     matches_minizic = []
     umpire_matches = []
+    matches_no_umpire = []
     is_elite_match = False
     class_index = []
     round_index = []
@@ -430,10 +431,13 @@ def minizinc_data(print_lists = True):
             for _ in range(0, inner):
                 if is_elite_match:
                     umpire_matches.append(count)
+                else:
+                    matches_no_umpire.append(count)
                 matches_minizic.append(count)
                 count += 1
         if number_event_dict[class_nr].endswith("A"):
             umpire_matches.append(count - 1) # last match was "A" final
+            matches_no_umpire = matches_no_umpire[:-1]
         class_nr += 1
     
     if print_lists:
@@ -449,6 +453,8 @@ def minizinc_data(print_lists = True):
         print(matches_minizic, end='\n\n')
         print("UMPIRE MATCHES:")
         print(umpire_matches, end='\n\n')
+        print("MATCHES WITHOUT UMPIRE MATCHES:")
+        print(matches_no_umpire, end='\n\n')
         print("STRONG COLLISION MINIZINC:")
         print(strong_collision_minizinc, end='\n\n')
         print("WEAK COLLISION:")
@@ -467,7 +473,8 @@ def minizinc_data(print_lists = True):
         "matchslots": matchslots,
         "last_of_day1": last_of_day1,
         "file_path": file_path,
-        "umpire_matches": umpire_matches
+        "umpire_matches": umpire_matches,
+        "matches_no_umpire": matches_no_umpire
     }
 
     return data

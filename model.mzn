@@ -4,6 +4,7 @@ int: nof_classes;
 int: nof_rounds;
 int: nof_matches;
 int: nof_umpire_matches;
+int: nof_matches_no_umpire;
 int: timeslots;
 int: fields;
 int: matchslots;
@@ -15,6 +16,7 @@ array[1..nof_classes] of int: class_index;
 array[1..nof_rounds] of int: round_index;
 array[1..nof_matches] of var 1..matchslots: matches;
 set of int: umpire_matches;
+array[1..nof_matches_no_umpire] of var 1..matchslots: matches_no_umpire
 array[1..nof_strong_collisions] of int: strong_collision;
 array[1..nof_weak_collisions] of int: weak_collision;
 
@@ -49,6 +51,16 @@ array[1..nof_classes] of set of int: matches_in_class =
 
 % Returns all matches in a round
 array[1..nof_rounds] of set of int: matches_in_round =
+    [ if r < nof_rounds then
+          round_index[r] .. round_index[r+1] - 1
+      else
+          round_index[r] .. nof_matches
+      endif
+      | r in 1..nof_rounds
+    ];
+
+% Returns all matches in a round that are not umpire matches
+array[1..nof_rounds] of set of int: matches_in_round_no_umpire =
     [ if r < nof_rounds then
           round_index[r] .. round_index[r+1] - 1
       else
@@ -106,16 +118,18 @@ constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == cl
 %constraint
 
 % There can only be 4 umpire matches per timeslot
-constraint 
-    forall (ts in 1..timeslots) (
-        card({matches[um] | um in umpire_matches where ((matches[um] - 1) div fields) == ts}) <= 4
+constraint
+    forall(ts in 1..timeslots)(
+        sum([ bool2int(time_of_match[um] == ts) | um in umpire_matches ]) <= 4
     );
 
 % umpire matches must have atleast 1 timeslot inbetween, all umpire matches are either in same timeslot or have a gap of >= 1 timeslot between them
-constraint
-    forall (m1, m2 in umpire_matches where m1 < m2) (
-        abs(((matches[m1] - 1) div fields) - ((matches[m2] - 1) div fields)) != 1
-    );
+array[1..card(umpire_matches)] of int: ums = sort([ m | m in umpire_matches ]);
+
+constraint forall(i in 1..(nof_umpire_matches - 1)) (
+    abs(time_of_match[ums[i]] - time_of_match[ums[i+1]]) != 1
+);
+
 
 
 % consecutive rounds in a class must have atleast 1 timeslot inbetween
@@ -140,7 +154,7 @@ constraint
     forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
         forall(c1 in matches_in_class[strong_collision[i]],
                c2 in matches_in_class[strong_collision[i+1]]) (
-            abs(((matches[c1] - 1) div fields) - ((matches[c2] - 1) div fields)) >= 2
+            abs(time_of_match[c1] - time_of_match[c2]) >= 2
        )
     );
 
@@ -149,7 +163,7 @@ constraint
     forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
         forall(c1 in matches_in_class[weak_collision[i]],
                c2 in matches_in_class[weak_collision[i+1]]) (
-            abs(((matches[c1] - 1) div fields) - ((matches[c2] - 1) div fields)) >= 1
+            abs(time_of_match[c1] - time_of_match[c2]) >= 1
        )
     );
 %constraint

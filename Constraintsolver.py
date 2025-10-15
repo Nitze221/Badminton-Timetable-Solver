@@ -19,12 +19,14 @@ data = minizinc_data()
 
 
 # Choose solver (you can replace "gecode" with another installed solver)
-gecode = minizinc.Solver.lookup("gecode")
+solver = minizinc.Solver.lookup("chuffed")
 
 # Create instance and give input
-instance = minizinc.Instance(gecode, model)
+instance = minizinc.Instance(solver, model)
 instance["nof_matches"] = len(data["matches"])
 instance["nof_umpire_matches"] = len(data["umpire_matches"])
+instance["nof_matches_no_umpire"] = len(data["matches_no_umpire"])
+
 instance["nof_classes"] = len(data["class_index"])
 instance["nof_rounds"] = len(data["round_index"])
 instance["nof_strong_collisions"] = len(data["strong_collision"])
@@ -33,6 +35,7 @@ instance["nof_weak_collisions"] = len(data["weak_collision"])
 instance["class_index"] = data["class_index"]
 instance["round_index"] = data["round_index"]
 instance["umpire_matches"] = data["umpire_matches"]
+instance["matches_no_umpire"] = data["matches_no_umpire"]
 
 instance["timeslots"] = data["timeslots"]
 instance["fields"] = data["fields"]
