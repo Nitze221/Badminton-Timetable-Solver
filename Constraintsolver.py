@@ -45,8 +45,7 @@ result = instance.solve(nr_solutions=1, processes=4, optimisation_level=4)
 instance
 # Access output
 print("RESULT:")
-print(result)
-print()
+print(result, end="\n\n")
 
 
 
