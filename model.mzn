@@ -104,9 +104,13 @@ constraint
     );
 
 constraint 
-    forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
+    forall(c in 1..nof_classes, r in 1..nof_rounds) (
         %abs(max([ matches[i] | i in matches_in_round[r] ]) - min([ matches[i] | i in matches_in_round[r] ])) < 2 * fields
-        abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 2
+        if card(matches_in_round[r]) > 5 then
+            abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 2
+        else
+            abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 1
+        endif
     );
 
 % Rundor i kolliderande klasser som inte hör till samma nivå får inte spelas på samma tidsslot
