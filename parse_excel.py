@@ -378,7 +378,7 @@ def minizinc_data(print_lists = True):
     # Matchslots can be made in a similar way as matches in the future if there is a varying amount of fields per timeslot.
     # for now assume constant amount of fields
     timeslots = day_one + day_two
-    fields = 10
+    fields = 12
     matchslots = timeslots * fields
     last_of_day1 = day_one * fields
 

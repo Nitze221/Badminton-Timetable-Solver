@@ -103,7 +103,7 @@ def build_schedule(class_index, round_index, matches, class_names):
     num_groups = 43  # assuming time slots start at 0
 
     # Initialize 2D list of None values (each slot has 10 possible matches)
-    schedule = [[None for _ in range(10)] for _ in range(num_groups)]
+    schedule = [[None for _ in range(data["fields"])] for _ in range(num_groups)]
 
     # Track how many matches are already in each time slot
     slot_counts = [0] * num_groups
@@ -111,12 +111,12 @@ def build_schedule(class_index, round_index, matches, class_names):
     # Go through each match
     for match_index, time_slot in enumerate(matches):
         # Find current count for this slot
-        group_slot = (time_slot - 1) // 10  # group every 10 slots together
+        group_slot = (time_slot - 1) // data["fields"]  # group every 10 slots together
         count = slot_counts[group_slot]
         
         match_index_plus_one = match_index + 1     # since matches index starts with 1
         # Only place if there’s still space
-        if count < 10:
+        if count < data["fields"]:
             class_id = find_class(match_index_plus_one, class_index)
             round_id = find_round(match_index_plus_one, class_index, round_index)
             schedule[group_slot][count] = f"{class_names[class_id - 1]} - {round_id}"

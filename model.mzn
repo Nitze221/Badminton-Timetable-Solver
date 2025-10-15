@@ -118,11 +118,18 @@ constraint
     forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
         forall(c1 in matches_in_class[strong_collision[i]],
                c2 in matches_in_class[strong_collision[i+1]]) (
-            abs(((matches[c1] - 1) div fields) - ((matches[c2] - 1) div fields)) >= 1
+            abs(((matches[c1] - 1) div fields) - ((matches[c2] - 1) div fields)) >= 2
        )
     );
 
 % weak collision
+constraint
+    forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
+        forall(c1 in matches_in_class[weak_collision[i]],
+               c2 in matches_in_class[weak_collision[i+1]]) (
+            abs(((matches[c1] - 1) div fields) - ((matches[c2] - 1) div fields)) >= 1
+       )
+    );
 %constraint
 %    forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
 %        forall(c1 in matches_in_class(weak_collision[i]),
