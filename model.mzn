@@ -80,7 +80,13 @@ constraint forall(t in 1..timeslots)(
 
 % All rounds in all classes are played in order
 % Aka. Within a class, a match in a round with a higher index must have a higher matchslot number
-constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (matches[i] < matches[j]);
+% constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (matches[i] < matches[j]);
+
+constraint forall (c in 1..nof_classes) (
+    forall (i in 1..(card(matches_in_class[c]) - 1)) (
+        matches[i] < matches[i + 1]
+    )
+);
 
 %constraint 
  %   forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
