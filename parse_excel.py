@@ -389,8 +389,13 @@ def minizinc_data(print_lists = True):
     # 2d list where index is class and element is list of matches (size = rounds)
     elimination_data_minizinc = [i[1] for i in elimination_data.items()]
 
-    event_number_dict = {i[1]: i[0] for i in enumerate(elimination_data.keys())}
-    event_to_number = lambda x: event_number_dict[x] + 1
+    event_number_dict = {i[1]: i[0] + 1 for i in enumerate(elimination_data.keys())}
+
+    number_event_dict = {x[1]: x[0] for x in event_number_dict.items()}
+
+    print(number_event_dict)
+
+    event_to_number = lambda x: event_number_dict[x]
 
     # collisions paired up
     seen_pairs = set()
@@ -405,28 +410,39 @@ def minizinc_data(print_lists = True):
                 seen_pairs.add(key)
                 strong_collision_minizinc.extend([a, b])
     
-    print("WEAK COLLISION:")
-    print(weak_collision, end="\n\n")
 
     weak_collision_minizinc = [item for i, (_, values) in enumerate(weak_collision.items())
         for v in values
         for item in (i + 1, event_to_number(v[0]))]
 
-    print("WEAK COLLISION MINIZINC:")
-    print(weak_collision_minizinc, end="\n\n")
-
     matches_minizic = []
+    umpire_matches = []
+    matches_no_umpire = []
+    is_elite_match = False
     class_index = []
     round_index = []
 
     count = 1
+    class_nr = 1
+
     for outer in elimination_data_minizinc:
+        is_elite_match = False
         class_index.append(count)
+        if number_event_dict[class_nr].endswith("V"):
+            is_elite_match = True
         for inner in outer:
             round_index.append(count)
             for _ in range(0, inner):
+                if is_elite_match:
+                    umpire_matches.append(count)
+                else:
+                    matches_no_umpire.append(count)
                 matches_minizic.append(count)
                 count += 1
+        if number_event_dict[class_nr].endswith("A"):
+            umpire_matches.append(count - 1) # last match was "A" final
+            matches_no_umpire = matches_no_umpire[:-1]
+        class_nr += 1
     
     if print_lists:
         print("TIMESLOTS:")
@@ -439,8 +455,16 @@ def minizinc_data(print_lists = True):
         print(round_index, end='\n\n')
         print("MATCHES:")
         print(matches_minizic, end='\n\n')
+        print("UMPIRE MATCHES:")
+        print(umpire_matches, end='\n\n')
+        print("MATCHES WITHOUT UMPIRE MATCHES:")
+        print(matches_no_umpire, end='\n\n')
         print("STRONG COLLISION MINIZINC:")
         print(strong_collision_minizinc, end='\n\n')
+        print("WEAK COLLISION:")
+        print(weak_collision, end="\n\n")
+        print("WEAK COLLISION MINIZINC:")
+        print(weak_collision_minizinc, end="\n\n")
 
     data = {
         "strong_collision": strong_collision_minizinc,
@@ -452,7 +476,9 @@ def minizinc_data(print_lists = True):
         "fields": fields,
         "matchslots": matchslots,
         "last_of_day1": last_of_day1,
-        "file_path": file_path
+        "file_path": file_path,
+        "umpire_matches": umpire_matches,
+        "matches_no_umpire": matches_no_umpire
     }
 
     return data
