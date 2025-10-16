@@ -2,7 +2,7 @@ import minizinc
 from parse_excel import minizinc_data
 
 # Load model
-model = minizinc.Model("model.mzn")
+model = minizinc.Model("model copy.mzn")
 
 '''
 data = {
@@ -20,6 +20,7 @@ data = minizinc_data()
 
 # Choose solver (you can replace "gecode" with another installed solver)
 solver = minizinc.Solver.lookup("chuffed")
+#solver = minizinc.Solver.lookup("gecode")
 
 # Create instance and give input
 instance = minizinc.Instance(solver, model)
@@ -31,6 +32,7 @@ instance["nof_classes"] = len(data["class_index"])
 instance["nof_rounds"] = len(data["round_index"])
 instance["nof_strong_collisions"] = len(data["strong_collision"])
 instance["nof_weak_collisions"] = len(data["weak_collision"])
+instance["nof_elit_rounds"] = data["nof_elit_rounds"]
 
 instance["class_index"] = data["class_index"]
 instance["round_index"] = data["round_index"]
@@ -44,6 +46,8 @@ instance["matchslots"] = data["matchslots"]
 instance["strong_collision"] = data["strong_collision"]
 instance["weak_collision"] = data["weak_collision"]
 instance["last_of_day1"] = data["last_of_day1"]
+
+
 
 # Solve
 result = instance.solve(nr_solutions=1, processes=1, optimisation_level=1)
@@ -61,8 +65,9 @@ print(result, end="\n\n")
 
 
 
-solution = result[0]
-matches = solution.matches
+
+#solution = result[0]
+#matches = solution.matches
 
 class_names = [
     "MS V", "WS V", "MD V", "WD V", "XD V",
@@ -135,10 +140,7 @@ def build_schedule(class_index, round_index, matches, class_names):
 
 
 
-schedule = build_schedule(data["class_index"], data["round_index"], matches, class_names)
-print("TIMESLOTS:")
-for i, slot in enumerate(schedule):
-    print(f"Time slot {i}: {slot}")
+
 
 
 
@@ -217,4 +219,17 @@ colors = {
     "MS C" : "FFF8E1", "WS C" : "FFECB3", "MD C" : "FFE082", "WD C" : "FFD54F", "XD C" : "FFCA28"
 }
 
-write_schedule_to_excel(data["file_path"], schedule, colors)
+if result.solution is None or len(result.solution) == 0:
+    print("❌ No solution found.")
+else:
+    solution = result.solution[0]
+    matches = solution.matches
+    print("✅ Solution found!")
+
+    schedule = build_schedule(data["class_index"], data["round_index"], matches, class_names)
+    print("TIMESLOTS:")
+    for i, slot in enumerate(schedule):
+        print(f"Time slot {i}: {slot}")
+
+    write_schedule_to_excel(data["file_path"], schedule, colors)
+

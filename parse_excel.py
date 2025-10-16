@@ -50,7 +50,6 @@ def parse_competition_excel(file_path, event_codes):
                 continue
             if "[withdrawn]" in str(col_d).strip().lower():
                 current_player = None
-                print("\nWithdrawn found!\n")
                 continue
 
             event_code = str(col_d)[:4].strip()
@@ -376,8 +375,8 @@ def minizinc_data(print_lists = True):
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)
     elimination_data, participants_structure = calculate_elimination_rounds(event_players)
-    day_one = half_hour_slots("2025-10-10 09:00", "2025-10-10 23:30")
-    day_two = half_hour_slots("2025-10-10 09:00", "2025-10-10 23:30")
+    day_one = half_hour_slots("2025-10-10 04:30", "2025-10-10 21:00")
+    day_two = half_hour_slots("2025-10-10 09:00", "2025-10-10 17:30")
 
     # Matchslots can be made in a similar way as matches in the future if there is a varying amount of fields per timeslot.
     # for now assume constant amount of fields
@@ -444,6 +443,8 @@ def minizinc_data(print_lists = True):
             matches_no_umpire = matches_no_umpire[:-1]
         class_nr += 1
     
+    nof_elit_rounds = sum(len(arr) for arr in elimination_data_minizinc[:5])
+    
     if print_lists:
         print("TIMESLOTS:")
         print(timeslots, end='\n\n')
@@ -465,6 +466,8 @@ def minizinc_data(print_lists = True):
         print(weak_collision, end="\n\n")
         print("WEAK COLLISION MINIZINC:")
         print(weak_collision_minizinc, end="\n\n")
+        print("AMOUNT OF ELITE ROUNDS")
+        print(nof_elit_rounds, end="\n\n")
 
     data = {
         "strong_collision": strong_collision_minizinc,
@@ -478,13 +481,14 @@ def minizinc_data(print_lists = True):
         "last_of_day1": last_of_day1,
         "file_path": file_path,
         "umpire_matches": umpire_matches,
-        "matches_no_umpire": matches_no_umpire
+        "matches_no_umpire": matches_no_umpire,
+        "nof_elit_rounds": nof_elit_rounds
     }
 
     return data
 
 def main():
-    file_path = "Entries 15.10.xlsx"  # <-- your Excel file
+    file_path = "Oficcial Entries.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision = analyze_collisions(event_correlations)

@@ -11,12 +11,13 @@ int: matchslots;
 int: nof_strong_collisions;
 int: nof_weak_collisions;
 int: last_of_day1;
+int: nof_elit_rounds;
 
 array[1..nof_classes] of int: class_index;
 array[1..nof_rounds] of int: round_index;
 array[1..nof_matches] of var 1..matchslots: matches;
 set of int: umpire_matches;
-array[1..nof_matches_no_umpire] of var 1..matchslots: matches_no_umpire
+array[1..nof_matches_no_umpire] of var 1..matchslots: matches_no_umpire;
 array[1..nof_strong_collisions] of int: strong_collision;
 array[1..nof_weak_collisions] of int: weak_collision;
 
@@ -79,18 +80,24 @@ function bool: is_semi_or_final(int: match, int: class) =
 
 array[1..nof_matches] of var 1..timeslots: time_of_match =
     [ (matches[i] - 1) div fields + 1 | i in 1..nof_matches ];
-
+% ???
 array[1..nof_matches] of var 1..fields: field_of_match =
     [ (matches[i] - 1) mod fields + 1 | i in 1..nof_matches ];
 
 
-constraint forall(t in 1..timeslots)(
-    alldifferent([ field_of_match[i] | i in 1..nof_matches where time_of_match[i] == t ])
-);
+
+
+
+
+
+% all matches have an available timeslot
+%constraint forall(t in 1..timeslots)(
+ %   alldifferent([ field_of_match[i] | i in 1..nof_matches where time_of_match[i] == t ])
+%);
 
 % all matches have an available timeslot
 
-%constraint alldifferent(matches);
+constraint alldifferent(matches);
 
 % All rounds in all classes are played in order
 % Aka. Within a class, a match in a round with a higher index must have a higher matchslot number
@@ -120,16 +127,19 @@ constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == cl
 % There can only be 4 umpire matches per timeslot
 constraint
     forall(ts in 1..timeslots)(
-        sum([ bool2int(time_of_match[um] == ts) | um in umpire_matches ]) <= 4
+        sum([ bool2int(time_of_match[um] == ts) | um in umpire_matches ]) <= 5
     );
 
 % umpire matches must have atleast 1 timeslot inbetween, all umpire matches are either in same timeslot or have a gap of >= 1 timeslot between them
 array[1..card(umpire_matches)] of int: ums = sort([ m | m in umpire_matches ]);
 
-constraint forall(i in 1..(nof_umpire_matches - 1)) (
-    abs(time_of_match[ums[i]] - time_of_match[ums[i+1]]) != 1
+constraint forall(i, j in 1..(nof_umpire_matches) where i < j) (
+    abs(time_of_match[ums[i]] - time_of_match[ums[j]]) != 1
 );
 
+%constraint forall(i in 1..(nof_umpire_matches - 1)) (
+ %   abs((matches[ums[i]] - 1) div fields - (matches[ums[i+1]] - 1) div fields) != 1
+%);
 
 
 % consecutive rounds in a class must have atleast 1 timeslot inbetween
@@ -138,16 +148,18 @@ constraint
         abs(min([ matches[i] | i in matches_in_round[r+1] ]) - max([ matches[i] | i in matches_in_round[r] ])) >= 2 * fields
     );
 
+
 % matches must be played within 1 or 2 rounds
 constraint 
-    forall(c in 1..nof_classes, r in 1..nof_rounds) (
+    forall(c in 6..nof_classes, r in (nof_elit_rounds+1)..nof_rounds) (
         %abs(max([ matches[i] | i in matches_in_round[r] ]) - min([ matches[i] | i in matches_in_round[r] ])) < 2 * fields
-        if card(matches_in_round[r]) > 5 then
+        if card(matches_in_round[r]) > 4 then
             abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 2
         else
             abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 1
         endif
     );
+
 
 % Rundor i kolliderande klasser som inte hör till samma nivå får inte spelas på samma tidsslot
 constraint
@@ -158,6 +170,7 @@ constraint
        )
     );
 
+
 % weak collision
 constraint
     forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
@@ -166,13 +179,7 @@ constraint
             abs(time_of_match[c1] - time_of_match[c2]) >= 1
        )
     );
-%constraint
-%    forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
-%        forall(c1 in matches_in_class(weak_collision[i]),
-%               c2 in matches_in_class(weak_collision[i+1])) (
-%            abs((matches[c1] div fields) - (matches[c2] div fields)) >= 1
-%        )
-%    );
+
 
 % All semi-finals and finals on day 2
 constraint 
