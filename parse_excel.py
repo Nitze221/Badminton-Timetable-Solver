@@ -71,23 +71,30 @@ def parse_competition_excel(file_path, event_codes):
 def analyze_collisions(event_correlations):
     strong_collision = {}
     weak_collision = {}
+    super_weak_collision = {}
 
     for event, correlations in event_correlations.items():
         event_suffix = event[-1] if event else ""
         same = []
-        different = []
+        different_1 = []
+        different_2 = []
 
         for other_event, count in correlations:
             other_suffix = other_event[-1] if other_event else ""
             if other_suffix == event_suffix:
                 same.append(other_event)
             else:
-                different.append((other_event, count))
+                if count > 1:
+                    different_1.append((other_event, count))
+                else:
+                    different_2.append((other_event, count))
+
 
         strong_collision[event] = same
-        weak_collision[event] = different
+        weak_collision[event] = different_1
+        super_weak_collision[event] = different_2
 
-    return strong_collision, weak_collision
+    return strong_collision, weak_collision, super_weak_collision
 
 def calculate_elimination_rounds(event_players):
     elimination_structure = {}
@@ -370,17 +377,18 @@ def half_hour_slots(start_datetime: str, end_datetime: str):
 
 def minizinc_data(print_lists = True):
 
-    file_path = "Entries HBC Premier Elite 2024 copy.xlsx"  # <-- your Excel file
+    file_path = "Entries HBC Premier Elite 2024 copy 2.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
-    strong_collision, weak_collision = analyze_collisions(event_correlations)
+    strong_collision, weak_collision, super_weak_collision = analyze_collisions(event_correlations)
     elimination_data, participants_structure = calculate_elimination_rounds(event_players)
-    day_one = half_hour_slots("2025-10-10 04:30", "2025-10-10 21:00") * 2
+    day_one = half_hour_slots("2025-10-10 09:00", "2025-10-10 17:00") * 2
     day_two = half_hour_slots("2025-10-10 09:00", "2025-10-10 17:30") * 2
 
     # Matchslots can be made in a similar way as matches in the future if there is a varying amount of fields per timeslot.
     # for now assume constant amount of fields
-    timeslots = day_one + day_two
+    timeslots = day_one + day_two # 90 ok
+    #timeslots = 
     fields = 12
     matchslots = timeslots * fields
     last_of_day1 = day_one * fields
@@ -411,6 +419,10 @@ def minizinc_data(print_lists = True):
     
 
     weak_collision_minizinc = [item for i, (_, values) in enumerate(weak_collision.items())
+        for v in values
+        for item in (i + 1, event_to_number(v[0]))]
+
+    super_weak_collision_minizinc = [item for i, (_, values) in enumerate(super_weak_collision.items())
         for v in values
         for item in (i + 1, event_to_number(v[0]))]
 
@@ -472,6 +484,7 @@ def minizinc_data(print_lists = True):
     data = {
         "strong_collision": strong_collision_minizinc,
         "weak_collision": weak_collision_minizinc,
+        "super_weak_collision": super_weak_collision_minizinc,
         "matches": matches_minizic,
         "class_index": class_index,
         "round_index": round_index,
@@ -491,7 +504,7 @@ def main():
     file_path = "Oficcial Entries.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
-    strong_collision, weak_collision = analyze_collisions(event_correlations)
+    strong_collision, weak_collision, super_weak_collision = analyze_collisions(event_correlations)
     elimination_data, participants_structure = calculate_elimination_rounds(event_players)
     rule_violations = check_rule_violations(player_events)
     problematic_players = find_problematic_players(player_events, event_players, event_correlations)

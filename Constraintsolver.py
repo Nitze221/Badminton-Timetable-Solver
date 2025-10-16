@@ -1,80 +1,11 @@
 import minizinc
+import asyncio
 from parse_excel import minizinc_data
 
-# Load model
-model = minizinc.Model("model.mzn")
 
-'''
-data = {
-    "strong_collision": strong_collision,
-    "weak_collision": weak_collision,
-    "matches": matches_minizic,
-    "class_index": class_index,
-    "round_index": round_index
-}
-'''
+from openpyxl import load_workbook, Workbook
+from openpyxl.styles import PatternFill
 
-data = minizinc_data()
-
-
-
-# Choose solver (you can replace "gecode" with another installed solver)
-solver = minizinc.Solver.lookup("chuffed")
-#solver = minizinc.Solver.lookup("gecode")
-
-# Create instance and give input
-instance = minizinc.Instance(solver, model)
-instance["nof_matches"] = len(data["matches"])
-instance["nof_umpire_matches"] = len(data["umpire_matches"])
-instance["nof_matches_no_umpire"] = len(data["matches_no_umpire"])
-
-instance["nof_classes"] = len(data["class_index"])
-instance["nof_rounds"] = len(data["round_index"])
-instance["nof_strong_collisions"] = len(data["strong_collision"])
-instance["nof_weak_collisions"] = len(data["weak_collision"])
-instance["nof_elit_rounds"] = data["nof_elit_rounds"]
-
-instance["class_index"] = data["class_index"]
-instance["round_index"] = data["round_index"]
-instance["umpire_matches"] = data["umpire_matches"]
-instance["matches_no_umpire"] = data["matches_no_umpire"]
-
-instance["timeslots"] = data["timeslots"]
-instance["fields"] = data["fields"]
-instance["matchslots"] = data["matchslots"]
-
-instance["strong_collision"] = data["strong_collision"]
-instance["weak_collision"] = data["weak_collision"]
-instance["last_of_day1"] = data["last_of_day1"]
-
-
-
-# Solve
-result = instance.solve(nr_solutions=1, processes=1, optimisation_level=1)
-instance
-# Access output
-print("RESULT:")
-print(result, end="\n\n")
-
-
-
-
-
-
-
-
-
-
-
-#solution = result[0]
-#matches = solution.matches
-
-class_names = [
-    "MS V", "WS V", "MD V", "WD V", "XD V",
-    "MS A", "WS A", "MD A", "WD A", "XD A",
-    "MS B", "WS B", "MD B", "WD B", "XD B",
-    "MS C", "WS C", "MD C", "WD C", "XD C"
-]
 
 
 def find_class(match_index, class_index):
@@ -108,12 +39,12 @@ def find_round(match_index, class_index, round_index):
     return round_id
 
 
-def build_schedule(class_index, round_index, matches, class_names):
+def build_schedule(class_index, round_index, matches, class_names, data):
     # Find how many time slots exist
     num_groups = data["timeslots"]  # assuming time slots start at 0
 
     # Initialize 2D list of None values (each slot has 10 possible matches)
-    schedule = [[None for _ in range(data["fields"])] for _ in range(num_groups)]
+    schedule = [["        " for _ in range(data["fields"])] for _ in range(num_groups)]
 
     # Track how many matches are already in each time slot
     slot_counts = [0] * num_groups
@@ -136,21 +67,6 @@ def build_schedule(class_index, round_index, matches, class_names):
             print(f"Warning: time slot {time_slot} already full")
 
     return schedule
-
-
-
-
-
-
-
-
-
-
-
-
-
-from openpyxl import load_workbook, Workbook
-from openpyxl.styles import PatternFill
 
 def write_schedule_to_excel(file_path, schedule, colors, sheet_name="timetable", start_row=2, start_col=2):
     """
@@ -194,9 +110,9 @@ def write_schedule_to_excel(file_path, schedule, colors, sheet_name="timetable",
 
             # Assign color if not yet assigned
             #if class_prefix not in class_color_map:
-             #   color_idx = len(class_color_map) % len(colors)
-              #  class_color_map[class_prefix] = PatternFill(start_color=colors[color_idx],
-               #                                             end_color=colors[color_idx],
+            #   color_idx = len(class_color_map) % len(colors)
+            #  class_color_map[class_prefix] = PatternFill(start_color=colors[color_idx],
+            #                                             end_color=colors[color_idx],
                 #                                            fill_type="solid")
             # Apply fill
             cell.fill = class_color_map[class_prefix]
@@ -219,17 +135,98 @@ colors = {
     "MS C" : "FFF8E1", "WS C" : "FFECB3", "MD C" : "FFE082", "WD C" : "FFD54F", "XD C" : "FFCA28"
 }
 
-if result.solution is None or len(result.solution) == 0:
-    print("❌ No solution found.")
-else:
-    solution = result.solution[0]
-    matches = solution.matches
-    print("✅ Solution found!")
+class_names = [
+        "MS V", "WS V", "MD V", "WD V", "XD V",
+        "MS A", "WS A", "MD A", "WD A", "XD A",
+        "MS B", "WS B", "MD B", "WD B", "XD B",
+        "MS C", "WS C", "MD C", "WD C", "XD C"
+    ]
 
-    schedule = build_schedule(data["class_index"], data["round_index"], matches, class_names)
-    print("TIMESLOTS:")
-    for i, slot in enumerate(schedule):
-        print(f"Time slot {i}: {slot}")
 
-    write_schedule_to_excel(data["file_path"], schedule, colors)
 
+
+async def main():
+    # Load model
+    model = minizinc.Model("model.mzn")
+
+    data = minizinc_data()
+
+
+
+    # Choose solver (you can replace "gecode" with another installed solver)
+    solver = minizinc.Solver.lookup("chuffed")
+    #solver = minizinc.Solver.lookup("gecode")
+
+    # Create instance and give input
+    instance = minizinc.Instance(solver, model)
+    instance["nof_matches"] = len(data["matches"])
+    instance["nof_umpire_matches"] = len(data["umpire_matches"])
+    instance["nof_matches_no_umpire"] = len(data["matches_no_umpire"])
+
+    instance["nof_classes"] = len(data["class_index"])
+    instance["nof_rounds"] = len(data["round_index"])
+    instance["nof_strong_collisions"] = len(data["strong_collision"])
+    instance["nof_weak_collisions"] = len(data["weak_collision"])
+    instance["nof_super_weak_collisions"] = len(data["super_weak_collision"])
+    instance["nof_elit_rounds"] = data["nof_elit_rounds"]
+
+    instance["class_index"] = data["class_index"]
+    instance["round_index"] = data["round_index"]
+    instance["umpire_matches"] = data["umpire_matches"]
+    instance["matches_no_umpire"] = data["matches_no_umpire"]
+
+    instance["timeslots"] = data["timeslots"]
+    instance["fields"] = data["fields"]
+    instance["matchslots"] = data["matchslots"]
+
+    instance["strong_collision"] = data["strong_collision"]
+    instance["weak_collision"] = data["weak_collision"]
+    instance["super_weak_collision"] = data["super_weak_collision"]
+    instance["last_of_day1"] = data["last_of_day1"]
+
+
+
+    # Solve
+    #result = instance.solve(nr_solutions=1, processes=1, optimisation_level=1)
+    result = instance.solutions(processes=1, optimisation_level=1, intermediate_solutions=True)
+
+    last_solution = None
+    async for res in result:
+
+        # Access output
+        print("\n\nRESULT:")
+        print(res.solution, end="\n\n")
+
+        if res.solution is None:
+            continue
+        
+        schedule = build_schedule(data["class_index"], data["round_index"], res.solution.matches, class_names, data)
+        print("TIMESLOTS:")
+        for i, slot in enumerate(schedule):
+            print(f"Time slot {i}: ", end=" | ")
+            for match in slot:
+                print(match, end=" | ")
+            print("")
+
+        last_solution = res.solution
+
+
+
+    #solution = result[0]
+    #matches = solution.matches
+
+    if last_solution is None or len(last_solution) == 0:
+        print("❌ No solution found.")
+    else:
+        solution = result.solution[0]
+        matches = solution.matches
+        print("✅ Solution found!")
+
+        schedule = build_schedule(data["class_index"], data["round_index"], matches, class_names, data)
+        print("TIMESLOTS:")
+        for i, slot in enumerate(schedule):
+            print(f"Time slot {i}: {slot}")
+
+        write_schedule_to_excel(data["file_path"], schedule, colors)
+
+asyncio.run(main())
