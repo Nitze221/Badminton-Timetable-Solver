@@ -2,7 +2,7 @@ import minizinc
 from parse_excel import minizinc_data
 
 # Load model
-model = minizinc.Model("model copy.mzn")
+model = minizinc.Model("model.mzn")
 
 '''
 data = {

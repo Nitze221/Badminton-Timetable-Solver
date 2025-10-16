@@ -134,7 +134,7 @@ constraint
 array[1..card(umpire_matches)] of int: ums = sort([ m | m in umpire_matches ]);
 
 constraint forall(i, j in 1..(nof_umpire_matches) where i < j) (
-    abs(time_of_match[ums[i]] - time_of_match[ums[j]]) != 1
+    not (abs(time_of_match[ums[i]] - time_of_match[ums[j]]) in 1..3)
 );
 
 %constraint forall(i in 1..(nof_umpire_matches - 1)) (
@@ -145,7 +145,7 @@ constraint forall(i, j in 1..(nof_umpire_matches) where i < j) (
 % consecutive rounds in a class must have atleast 1 timeslot inbetween
 constraint 
     forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        abs(min([ matches[i] | i in matches_in_round[r+1] ]) - max([ matches[i] | i in matches_in_round[r] ])) >= 2 * fields
+        abs(min([ matches[i] | i in matches_in_round[r+1] ]) - max([ matches[i] | i in matches_in_round[r] ])) >= 4 * fields
     );
 
 
@@ -154,9 +154,9 @@ constraint
     forall(c in 6..nof_classes, r in (nof_elit_rounds+1)..nof_rounds) (
         %abs(max([ matches[i] | i in matches_in_round[r] ]) - min([ matches[i] | i in matches_in_round[r] ])) < 2 * fields
         if card(matches_in_round[r]) > 4 then
-            abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 2
+            abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 4
         else
-            abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 1
+            abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 2
         endif
     );
 
@@ -166,7 +166,7 @@ constraint
     forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
         forall(c1 in matches_in_class[strong_collision[i]],
                c2 in matches_in_class[strong_collision[i+1]]) (
-            abs(time_of_match[c1] - time_of_match[c2]) >= 2
+            abs(time_of_match[c1] - time_of_match[c2]) >= 4
        )
     );
 
@@ -176,7 +176,7 @@ constraint
     forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
         forall(c1 in matches_in_class[weak_collision[i]],
                c2 in matches_in_class[weak_collision[i+1]]) (
-            abs(time_of_match[c1] - time_of_match[c2]) >= 1
+            abs(time_of_match[c1] - time_of_match[c2]) >= 3
        )
     );
 
