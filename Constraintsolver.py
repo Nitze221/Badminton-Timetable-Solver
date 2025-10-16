@@ -169,6 +169,7 @@ async def main():
     instance["nof_weak_collisions"] = len(data["weak_collision"])
     instance["nof_super_weak_collisions"] = len(data["super_weak_collision"])
     instance["nof_elit_rounds"] = data["nof_elit_rounds"]
+    instance["nof_elit_classes"] = data["nof_elit_classes"]
 
     instance["class_index"] = data["class_index"]
     instance["round_index"] = data["round_index"]
@@ -183,6 +184,8 @@ async def main():
     instance["weak_collision"] = data["weak_collision"]
     instance["super_weak_collision"] = data["super_weak_collision"]
     instance["last_of_day1"] = data["last_of_day1"]
+
+    
 
 
 
@@ -199,16 +202,19 @@ async def main():
 
         if res.solution is None:
             continue
-        
-        schedule = build_schedule(data["class_index"], data["round_index"], res.solution.matches, class_names, data)
-        print("TIMESLOTS:")
-        for i, slot in enumerate(schedule):
-            print(f"Time slot {i}: ", end=" | ")
-            for match in slot:
-                print(match, end=" | ")
-            print("")
+        else:
+            schedule = build_schedule(data["class_index"], data["round_index"], res.solution.matches, class_names, data)
+            print("TIMESLOTS:")
+            for i, slot in enumerate(schedule):
+                if i < 10:
+                    print(f"Time slot {i}:  ", end=" | ")
+                else:
+                    print(f"Time slot {i}: ", end=" | ")
+                for match in slot:
+                    print(match, end=" | ")
+                print("")
 
-        last_solution = res.solution
+            last_solution = res.solution
 
 
 

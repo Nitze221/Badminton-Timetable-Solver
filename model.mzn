@@ -13,6 +13,7 @@ int: nof_weak_collisions;
 int: nof_super_weak_collisions;
 int: last_of_day1;
 int: nof_elit_rounds;
+int: nof_elit_classes;
 
 array[1..nof_classes] of int: class_index;
 array[1..nof_rounds] of int: round_index;
@@ -153,7 +154,7 @@ constraint
 
 % matches must be played within 1 or 2 rounds
 constraint 
-    forall(c in 6..nof_classes, r in (nof_elit_rounds+1)..nof_rounds) (
+    forall(c in (nof_elit_classes+1)..nof_classes, r in (nof_elit_rounds+1)..nof_rounds) (
         %abs(max([ matches[i] | i in matches_in_round[r] ]) - min([ matches[i] | i in matches_in_round[r] ])) < 2 * fields
         if card(matches_in_round[r]) > 4 then
             abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 3
@@ -243,7 +244,20 @@ constraint
             int: nof_rounds_in_class = card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c})
         } in
             (max_t - min_t + 1 <= nof_rounds_in_class * 8)
-            /\
+    );
+
+% In classes with <= 4 rounds
+% All rounds should be played on the same day
+constraint
+    forall(c in 1..nof_classes where 
+        card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c}) <= 4
+    )(
+        let {
+            set of int: mc = matches_in_class[c],
+            var int: min_t = min([ time_of_match[m] | m in mc ]),
+            var int: max_t = max([ time_of_match[m] | m in mc ]),
+            int: nof_rounds_in_class = card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c})
+        } in
             (forall(m in mc)(matches[m] <= last_of_day1) \/ forall(m in mc)(matches[m] > last_of_day1))
     );
 

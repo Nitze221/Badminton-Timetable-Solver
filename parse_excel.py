@@ -377,7 +377,7 @@ def half_hour_slots(start_datetime: str, end_datetime: str):
 
 def minizinc_data(print_lists = True):
 
-    file_path = "Entries HBC Premier Elite 2024 copy 2.xlsx"  # <-- your Excel file
+    file_path = "Entries HBC Premier Elite 2024 copy 3.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision, super_weak_collision = analyze_collisions(event_correlations)
@@ -432,6 +432,10 @@ def minizinc_data(print_lists = True):
     is_elite_match = False
     class_index = []
     round_index = []
+    first_singles_round_M = []
+    first_doubles_mixt_round_M = []
+    first_singles_round_W = []
+    first_doubles_mixt_round_W = []
 
     count = 1
     class_nr = 1
@@ -455,7 +459,8 @@ def minizinc_data(print_lists = True):
             matches_no_umpire = matches_no_umpire[:-1]
         class_nr += 1
     
-    nof_elit_rounds = sum(len(arr) for arr in elimination_data_minizinc[:5])
+    nof_elit_classes = 5
+    nof_elit_rounds = sum(len(arr) for arr in elimination_data_minizinc[:nof_elit_classes])
     
     if print_lists:
         print("TIMESLOTS:")
@@ -495,7 +500,8 @@ def minizinc_data(print_lists = True):
         "file_path": file_path,
         "umpire_matches": umpire_matches,
         "matches_no_umpire": matches_no_umpire,
-        "nof_elit_rounds": nof_elit_rounds
+        "nof_elit_rounds": nof_elit_rounds,
+        "nof_elit_classes": nof_elit_classes
     }
 
     return data
