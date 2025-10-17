@@ -1,4 +1,9 @@
 include "alldifferent.mzn";
+include "at_most.mzn";
+include "arg_max.mzn";
+include "arg_min.mzn";
+include "strictly_increasing.mzn";
+include "disjunctive.mzn"
 
 int: nof_classes;
 int: nof_rounds;
@@ -19,7 +24,7 @@ array[1..nof_classes] of int: class_index;
 array[1..nof_rounds] of int: round_index;
 array[1..nof_matches] of var 1..matchslots: matches;
 set of int: umpire_matches;
-array[1..nof_matches_no_umpire] of var 1..matchslots: matches_no_umpire;
+array[1..nof_matches_no_umpire] of int: matches_no_umpire;
 array[1..nof_strong_collisions] of int: strong_collision;
 array[1..nof_weak_collisions] of int: weak_collision;
 array[1..nof_super_weak_collisions] of int: super_weak_collision;
@@ -88,6 +93,14 @@ array[1..nof_matches] of var 1..fields: field_of_match =
     [ (matches[i] - 1) mod fields + 1 | i in 1..nof_matches ];
 
 
+array[1..nof_rounds] of var int: max_match_index_in_round =
+    [ matches_in_round[r][arg_max([ matches[i] | i in matches_in_round[r] ])]
+      | r in 1..nof_rounds ];
+
+
+array[1..nof_rounds] of var int: min_match_index_in_round =
+    [ matches_in_round[r][arg_min([ matches[i] | i in matches_in_round[r] ])]
+      | r in 1..nof_rounds ];
 
 
 
@@ -104,7 +117,11 @@ constraint alldifferent(matches);
 
 % All rounds in all classes are played in order
 % Aka. Within a class, a match in a round with a higher index must have a higher matchslot number
-constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (matches[i] < matches[j]);
+% constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (matches[i] < matches[j]);
+
+constraint forall(c in 1..nof_classes)(
+    strictly_increasing([matches[i] | i in matches_in_class[c]])
+);
 
 %constraint forall (c in 1..nof_classes) (
  %   forall (i in 1..(card(matches_in_class[c]) - 1)) (
@@ -146,20 +163,40 @@ constraint forall(i, j in 1..(nof_umpire_matches) where i < j) (
 
 
 % consecutive rounds in a class must have atleast 60 min inbetween
+%constraint 
+%    forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
+%        abs(min([ matches[i] | i in matches_in_round[r+1] ]) - max([ matches[i] | i in matches_in_round[r] ])) > 3 * fields
+%
+%    );
+
+%constraint 
+%    forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
+%        abs(time_of_match[min_match_index_in_round[r + 1]] - time_of_match[max_match_index_in_round[r]]) > 3
+%    );
+
 constraint 
     forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        abs(min([ matches[i] | i in matches_in_round[r+1] ]) - max([ matches[i] | i in matches_in_round[r] ])) > 3 * fields
+        disjunctive(max_match_index_in_round[r], abs(time_of_match[min_match_index_in_round[r + 1]] - time_of_match[max_match_index_in_round[r]]) * 3)
     );
 
 
 % matches must be played within 1 or 2 rounds
-constraint 
-    forall(c in (nof_elit_classes+1)..nof_classes, r in (nof_elit_rounds+1)..nof_rounds) (
-        %abs(max([ matches[i] | i in matches_in_round[r] ]) - min([ matches[i] | i in matches_in_round[r] ])) < 2 * fields
+%constraint 
+%    forall(c in (nof_elit_classes+1)..nof_classes, r in (nof_elit_rounds+1)..nof_rounds) (
+%        %abs(max([ matches[i] | i in matches_in_round[r] ]) - min([ matches[i] | i in matches_in_round[r] ])) < 2 * fields
+%        if card(matches_in_round[r]) > 4 then
+%            abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 3
+%        else
+%            abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 2
+%        endif
+%    );
+
+constraint
+    forall(c in (nof_elit_classes+1)..nof_classes, r in (nof_elit_rounds+1)..nof_rounds)(
         if card(matches_in_round[r]) > 4 then
-            abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 3
+            abs(time_of_match[max_match_index_in_round[r]] - time_of_match[min_match_index_in_round[r]]) < 3
         else
-            abs((max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields - (min([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) < 2
+            abs(time_of_match[max_match_index_in_round[r]] - time_of_match[min_match_index_in_round[r]]) < 2
         endif
     );
 
@@ -277,4 +314,4 @@ constraint
     );
 
 
-solve minimize (max(matches)- min(matches))
+solve minimize max(matches)

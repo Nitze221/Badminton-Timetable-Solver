@@ -191,13 +191,14 @@ async def main():
 
     # Solve
     #result = instance.solve(nr_solutions=1, processes=1, optimisation_level=1)
-    result = instance.solutions(processes=1, optimisation_level=1, intermediate_solutions=True)
+    result = instance.solutions(processes=1, optimisation_level=3, intermediate_solutions=True, verbose=True, statistics=True, profile=True)
 
     last_solution = None
     async for res in result:
 
         # Access output
         print("\n\nRESULT:")
+        print(res.statistics)
         print(res.solution, end="\n\n")
 
         if res.solution is None:
