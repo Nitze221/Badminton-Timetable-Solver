@@ -17,6 +17,7 @@ int: nof_strong_collisions;
 int: nof_weak_collisions;
 int: nof_super_weak_collisions;
 int: last_of_day1;
+int: last_of_day0;
 int: nof_elit_rounds;
 int: nof_elit_classes;
 

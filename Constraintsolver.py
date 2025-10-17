@@ -98,7 +98,7 @@ def write_schedule_to_excel(file_path, schedule, colors, sheet_name="timetable",
     # Transpose so each time slot is a column
     for col_idx, time_slot in enumerate(schedule, start=start_col):
         for row_idx, match in enumerate(time_slot, start=start_row):
-            if match is None:
+            if match == "        ":
                 continue
 
             # Write match
@@ -184,8 +184,8 @@ async def main():
     instance["weak_collision"] = data["weak_collision"]
     instance["super_weak_collision"] = data["super_weak_collision"]
     instance["last_of_day1"] = data["last_of_day1"]
+    instance["last_of_day0"] = data["last_of_day0"]
 
-    
 
 
 
@@ -222,11 +222,11 @@ async def main():
     #solution = result[0]
     #matches = solution.matches
 
-    if last_solution is None or len(last_solution) == 0:
+    if last_solution is None:
         print("❌ No solution found.")
     else:
-        solution = result.solution[0]
-        matches = solution.matches
+        #solution = result.solution[0]
+        matches = last_solution.matches
         print("✅ Solution found!")
 
         schedule = build_schedule(data["class_index"], data["round_index"], matches, class_names, data)
@@ -236,4 +236,29 @@ async def main():
 
         write_schedule_to_excel(data["file_path"], schedule, colors)
 
+
 asyncio.run(main())
+
+
+'''
+
+
+data = minizinc_data()
+
+matches = [492, 518, 519, 520, 557, 558, 559, 560, 597, 598, 638, 414, 416, 420, 484, 485, 486, 488, 526, 562, 599, 9, 10, 55, 57, 58, 59, 151, 154, 191, 8, 11, 12, 60, 148, 150, 187, 107, 253, 254, 256, 257, 294, 295, 296, 297, 334, 335, 372, 341, 342, 343, 344, 345, 346, 347, 348, 364, 365, 366, 367, 368, 405, 406, 408, 409, 410, 411, 412, 413, 450, 451, 452, 453, 490, 491, 528, 512, 513, 514, 552, 561, 600, 1, 43, 46, 156, 423, 424, 425, 467, 468, 637, 92, 93, 94, 95, 96, 108, 222, 223, 224, 225, 262, 263, 300, 349, 350, 351, 352, 389, 390, 391, 392, 393, 394, 395, 396, 438, 439, 440, 441, 478, 479, 516, 493, 534, 535, 536, 537, 574, 575, 612, 73, 74, 75, 76, 113, 114, 115, 116, 117, 118, 119, 120, 553, 554, 555, 556, 595, 596, 636, 28, 40, 82, 184, 185, 188, 190, 192, 193, 194, 195, 232, 233, 234, 235, 272, 273, 311, 274, 275, 276, 277, 278, 279, 280, 317, 318, 319, 320, 321, 322, 323, 324, 446, 447, 448, 449, 487, 489, 527, 25, 26, 65, 66, 67, 68, 105, 106, 384, 2, 3, 4, 5, 6, 7, 44, 45, 47, 48, 369, 370, 407, 523, 524, 590, 591, 632, 145, 146, 147, 149, 186, 189, 228]
+
+schedule = build_schedule(data["class_index"], data["round_index"], matches, class_names, data)
+print("TIMESLOTS:")
+for i, slot in enumerate(schedule):
+    if i < 10:
+        print(f"Time slot {i}:  ", end=" | ")
+    else:
+        print(f"Time slot {i}: ", end=" | ")
+    for match in slot:
+        print(match, end=" | ")
+    print("")
+
+write_schedule_to_excel(data["file_path"], schedule, colors)
+
+
+'''
