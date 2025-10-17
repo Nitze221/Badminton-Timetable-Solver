@@ -178,7 +178,7 @@ constraint forall(i, j in 1..(nof_umpire_matches) where i < j) (
 
 constraint 
     forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        abs(time_of_match[min_match_index_in_round[r + 1]] - time_of_match[max_match_index_in_round[r]]) > 3
+        abs(time_of_match[min_match_index_in_round[r + 1]] - time_of_match[max_match_index_in_round[r]]) >= 4
     );
 
 %constraint 
@@ -272,14 +272,6 @@ constraint
         forall(m in matches_in_round[r])(time_of_match[m] > last_of_day0)
     ));
 
-%constraint
-%  forall(r in 1..nof_rounds) (
-%      (max(matches_in_round[r]) <= last_of_day0)
-%      \/
-%      (min(matches_in_round[r]) > last_of_day0 /\ max(matches_in_round[r]) <= last_of_day1)
-%      \/
-%      (min(matches_in_round[r]) > last_of_day1)
-%  );
 
 constraint (min(time_of_match) == 1);
 
@@ -303,14 +295,14 @@ constraint
             var int: max_t = max([ time_of_match[m] | m in mc ]),
             int: nof_rounds_in_class = card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c})
         } in
-            (max_t - min_t + 1 <= nof_rounds_in_class * 8)
+            (max_t - min_t + 1 <= nof_rounds_in_class * 10)
     );
 
 % In classes with <= 4 rounds
 % All rounds should be played on the same day
 constraint
     forall(c in 1..nof_classes where 
-        card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c}) <= 4
+        card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c}) <= 3
     )(
         let {
             set of int: mc = matches_in_class[c],
@@ -333,7 +325,7 @@ constraint
             var int: max_t = max([ time_of_match[m] | m in mc ]),
             int: nof_rounds_in_class = card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c})
         } in
-            (max_t - min_t + 1 <= nof_rounds_in_class * 10)
+            (max_t - min_t + 1 <= nof_rounds_in_class * 12)
     );
 
 
