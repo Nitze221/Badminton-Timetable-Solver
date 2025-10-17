@@ -12,6 +12,7 @@ int: nof_strong_collisions;
 int: nof_weak_collisions;
 int: nof_super_weak_collisions;
 int: last_of_day1;
+int: last_of_day0;
 int: nof_elit_rounds;
 int: nof_elit_classes;
 
@@ -148,7 +149,7 @@ constraint forall(i, j in 1..(nof_umpire_matches) where i < j) (
 % consecutive rounds in a class must have atleast 60 min inbetween
 constraint 
     forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        abs(min([ matches[i] | i in matches_in_round[r+1] ]) - max([ matches[i] | i in matches_in_round[r] ])) > 3 * fields
+        abs((min([ matches[i] | i in matches_in_round[r+1] ]) - 1) div fields - (max([ matches[i] | i in matches_in_round[r] ]) - 1) div fields) >= 4
     );
 
 
@@ -277,4 +278,4 @@ constraint
     );
 
 
-solve minimize (max(matches)- min(matches))
+solve minimize (max(matches))
