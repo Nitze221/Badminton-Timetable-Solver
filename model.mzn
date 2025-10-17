@@ -128,7 +128,7 @@ constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == cl
 
 %constraint
 
-% There can only be 4 umpire matches per timeslot
+% There can only be 5 umpire matches per timeslot
 constraint
     forall(ts in 1..timeslots)(
         sum([ bool2int(time_of_match[um] == ts) | um in umpire_matches ]) <= 5
@@ -165,7 +165,7 @@ constraint
     );
 
 
-% strong collisions
+% strong collisions - 1h between classes
 constraint
     forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
         forall(c1 in matches_in_class[strong_collision[i]],
@@ -175,16 +175,16 @@ constraint
     );
 
 
-% weak collision
+% weak collision - 30 min between classes
 constraint
     forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
         forall(c1 in matches_in_class[weak_collision[i]],
                c2 in matches_in_class[weak_collision[i+1]]) (
-            abs(time_of_match[c1] - time_of_match[c2]) >= 3
+            abs(time_of_match[c1] - time_of_match[c2]) >= 2
        )
     );
 
-% super weak collision
+% super weak collision - 15 min between classes
 constraint
     forall(i in 1..nof_super_weak_collisions where i mod 2 == 1) (
         forall(c1 in matches_in_class[super_weak_collision[i]],
@@ -222,6 +222,14 @@ constraint
         forall(m in matches_in_round[r])(m > last_of_day1)
     ));
 
+constraint
+    (forall(r in 1..nof_rounds)(
+        forall(m in matches_in_round[r])(m <= last_of_day0)
+    \/
+        forall(m in matches_in_round[r])(m > last_of_day0)
+    ));
+
+
 constraint (min(matches) == 1);
 
 % All adjecent timeslots can max have filed amount of matches
@@ -232,7 +240,7 @@ constraint
     );
 
 % In classes with ≤ 3 rounds:
-%  all matches must start within (rounds-of-class * 8) timeslots
+%  all matches must start within (rounds-of-class * 10) timeslots
 %  all matches must also be on the same day (either all ≤ last_of_day1 or all > last_of_day1)
 constraint
     forall(c in 1..nof_classes where 
@@ -244,14 +252,14 @@ constraint
             var int: max_t = max([ time_of_match[m] | m in mc ]),
             int: nof_rounds_in_class = card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c})
         } in
-            (max_t - min_t + 1 <= nof_rounds_in_class * 8)
+            (max_t - min_t + 1 <= nof_rounds_in_class * 10)
     );
 
-% In classes with <= 4 rounds
+% In classes with <= 3 rounds
 % All rounds should be played on the same day
 constraint
     forall(c in 1..nof_classes where 
-        card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c}) <= 4
+        card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c}) <= 3
     )(
         let {
             set of int: mc = matches_in_class[c],
@@ -263,7 +271,7 @@ constraint
     );
 
 % In classes with > 3 rounds
-%  all matches must start within (rounds-of-class * 10) timeslots
+%  all matches must start within (rounds-of-class * 12) timeslots
 constraint
     forall(c in 1..nof_classes where 
         card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c}) > 3
@@ -274,7 +282,7 @@ constraint
             var int: max_t = max([ time_of_match[m] | m in mc ]),
             int: nof_rounds_in_class = card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c})
         } in
-            (max_t - min_t + 1 <= nof_rounds_in_class * 10)
+            (max_t - min_t + 1 <= nof_rounds_in_class * 12)
     );
 
 

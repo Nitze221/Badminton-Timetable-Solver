@@ -84,7 +84,7 @@ def analyze_collisions(event_correlations):
             if other_suffix == event_suffix:
                 same.append(other_event)
             else:
-                if count > 1:
+                if count > 2:
                     different_1.append((other_event, count))
                 else:
                     different_2.append((other_event, count))
@@ -420,14 +420,35 @@ def minizinc_data(print_lists = True):
                 seen_pairs.add(key)
                 strong_collision_minizinc.extend([a, b])
     
+    seen_pairs = set()
+    weak_collision_minizinc = []
+    for i, (_, values) in enumerate(weak_collision.items()):
+        for v in values:
+            a = i + 1
+            b = event_to_number(v[0])   # v is a tuple of event name and amount of colliding players
+            key = tuple(sorted((a, b)))
+            if key not in seen_pairs:
+                seen_pairs.add(key)
+                weak_collision_minizinc.extend([a, b])
+    
+    seen_pairs = set()
+    super_weak_collision_minizinc = []
+    for i, (_, values) in enumerate(super_weak_collision.items()):
+        for v in values:
+            a = i + 1
+            b = event_to_number(v[0])   # v is a tuple of event name and amount of colliding players
+            key = tuple(sorted((a, b)))
+            if key not in seen_pairs:
+                seen_pairs.add(key)
+                super_weak_collision_minizinc.extend([a, b])
 
-    weak_collision_minizinc = [item for i, (_, values) in enumerate(weak_collision.items())
-        for v in values
-        for item in (i + 1, event_to_number(v[0]))]
+    #weak_collision_minizinc = [item for i, (_, values) in enumerate(weak_collision.items())
+     #   for v in values
+      #  for item in (i + 1, event_to_number(v[0]))]
 
-    super_weak_collision_minizinc = [item for i, (_, values) in enumerate(super_weak_collision.items())
-        for v in values
-        for item in (i + 1, event_to_number(v[0]))]
+    #super_weak_collision_minizinc = [item for i, (_, values) in enumerate(super_weak_collision.items())
+     #   for v in values
+      #  for item in (i + 1, event_to_number(v[0]))]
 
     matches_minizic = []
     umpire_matches = []
@@ -480,12 +501,18 @@ def minizinc_data(print_lists = True):
         print(umpire_matches, end='\n\n')
         print("MATCHES WITHOUT UMPIRE MATCHES:")
         print(matches_no_umpire, end='\n\n')
+        print("STRONG COLLISION:")
+        print(strong_collision, end='\n\n')
         print("STRONG COLLISION MINIZINC:")
-        print(strong_collision_minizinc, end='\n\n')
+        print(strong_collision_minizinc, end="\n\n")
         print("WEAK COLLISION:")
         print(weak_collision, end="\n\n")
         print("WEAK COLLISION MINIZINC:")
         print(weak_collision_minizinc, end="\n\n")
+        print("SUPER WEAK COLLISION:")
+        print(super_weak_collision, end="\n\n")
+        print("SUPER WEAK COLLISION MINIZINC:")
+        print(super_weak_collision_minizinc, end="\n\n")
         print("AMOUNT OF ELITE ROUNDS")
         print(nof_elit_rounds, end="\n\n")
 
