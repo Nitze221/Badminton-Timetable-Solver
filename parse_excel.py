@@ -392,8 +392,8 @@ def minizinc_data(print_lists = True):
     #timeslots = 
     fields = 10
     matchslots = timeslots * fields
-    last_of_day1 = (day_zero + day_one) * fields
-    last_of_day0 = day_zero * fields
+    last_of_day1 = (day_zero + day_one)
+    last_of_day0 = day_zero
 
     # 2d list where index is class and element is list of matches (size = rounds)
     elimination_data_minizinc = [i[1] for i in elimination_data.items()]

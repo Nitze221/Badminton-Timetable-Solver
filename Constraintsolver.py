@@ -39,7 +39,7 @@ def find_round(match_index, class_index, round_index):
     return round_id
 
 
-def build_schedule(class_index, round_index, matches, class_names, data):
+def build_schedule(class_index, round_index, time_of_match, class_names, data):
     # Find how many time slots exist
     num_groups = data["timeslots"]  # assuming time slots start at 0
 
@@ -50,21 +50,21 @@ def build_schedule(class_index, round_index, matches, class_names, data):
     slot_counts = [0] * num_groups
 
     # Go through each match
-    for match_index, time_slot in enumerate(matches):
+    for match_index, time_slot in enumerate(time_of_match):
         # Find current count for this slot
-        group_slot = (time_slot - 1) // data["fields"]  # group every 10 slots together
-        count = slot_counts[group_slot]
+        # group_slot = (time_slot - 1) // data["fields"]  # group every 10 slots together
+        count = slot_counts[time_slot-1]
         
         match_index_plus_one = match_index + 1     # since matches index starts with 1
         # Only place if there’s still space
         if count < data["fields"]:
             class_id = find_class(match_index_plus_one, class_index)
             round_id = find_round(match_index_plus_one, class_index, round_index)
-            schedule[group_slot][count] = f"{class_names[class_id - 1]} - {round_id}"
-            slot_counts[group_slot] += 1
+            schedule[time_slot-1][count] = f"{class_names[class_id - 1]} - {round_id}"
+            slot_counts[time_slot-1] += 1
         else:
             # Optional: warn if slot overflows
-            print(f"Warning: time slot {time_slot} already full")
+            print(f"Warning: time slot {time_slot-1} already full")
 
     return schedule
 
@@ -147,7 +147,7 @@ class_names = [
 
 async def main():
     # Load model
-    model = minizinc.Model("model.mzn")
+    model = minizinc.Model("model_tof.mzn")
 
     data = minizinc_data()
 
@@ -191,7 +191,7 @@ async def main():
 
     # Solve
     #result = instance.solve(nr_solutions=1, processes=1, optimisation_level=1)
-    result = instance.solutions(processes=1, optimisation_level=3, intermediate_solutions=True, verbose=True, statistics=True, profile=True)
+    result = instance.solutions(processes=1, optimisation_level=3, intermediate_solutions=True, verbose=True, statistics=True)
 
     last_solution = None
     async for res in result:
@@ -204,7 +204,7 @@ async def main():
         if res.solution is None:
             continue
         else:
-            schedule = build_schedule(data["class_index"], data["round_index"], res.solution.matches, class_names, data)
+            schedule = build_schedule(data["class_index"], data["round_index"], res.solution.time_of_match, class_names, data)
             print("TIMESLOTS:")
             for i, slot in enumerate(schedule):
                 if i < 10:
@@ -226,7 +226,7 @@ async def main():
         print("❌ No solution found.")
     else:
         #solution = result.solution[0]
-        matches = last_solution.matches
+        matches = last_solution.time_of_match
         print("✅ Solution found!")
 
         schedule = build_schedule(data["class_index"], data["round_index"], matches, class_names, data)
