@@ -3,7 +3,7 @@ include "at_most.mzn";
 include "arg_max.mzn";
 include "arg_min.mzn";
 include "increasing.mzn";
-include "disjunctive.mzn";
+include "cumulative.mzn";
 
 int: nof_classes;
 int: nof_rounds;
@@ -87,6 +87,14 @@ function bool: is_semi_or_final(int: match, int: class) =
         match >= nof_matches - 2
     endif;
 
+% TRUE if the match is a final
+function bool: is_final(int: match, int: class) =
+    if class < nof_classes then
+        match == class_index[class + 1] - 1
+    else
+        match == nof_matches
+    endif;
+
 %array[1..nof_matches] of var 1..timeslots: time_of_match =
 %    [ (matches[i] - 1) div fields + 1 | i in 1..nof_matches ];
 % ???
@@ -94,13 +102,13 @@ function bool: is_semi_or_final(int: match, int: class) =
 %    [ (matches[i] - 1) mod fields + 1 | i in 1..nof_matches ];
 
 
-array[1..nof_rounds] of var int: max_match_index_in_round =
-    [ matches_in_round[r][arg_max([ time_of_match[i] | i in matches_in_round[r] ])]
+array[1..nof_rounds] of var int: max_match_time_in_round =
+    [ max([ time_of_match[i] | i in matches_in_round[r] ])
       | r in 1..nof_rounds ];
 
 
-array[1..nof_rounds] of var int: min_match_index_in_round =
-    [ matches_in_round[r][arg_min([ time_of_match[i] | i in matches_in_round[r] ])]
+array[1..nof_rounds] of var int: min_match_time_in_round =
+    [ min([ time_of_match[i] | i in matches_in_round[r] ])
       | r in 1..nof_rounds ];
 
 
@@ -116,19 +124,36 @@ array[1..nof_rounds] of var int: min_match_index_in_round =
 
 % constraint alldifferent(matches);
 
-% max fields matches per timeslot
-constraint forall(ts in 1..timeslots)(
-    sum([bool2int(time_of_match[m] == ts) | m in 1..nof_matches]) <= fields
-);
 
 
 % All rounds in all classes are played in order
 % Aka. Within a class, a match in a round with a higher index must have a higher matchslot number
 % constraint forall (i, j in 1..nof_matches where i < j /\ class_of_match[i] == class_of_match[j]) (matches[i] < matches[j]);
 
-constraint forall(c in 1..nof_classes)(
-    increasing([time_of_match[i] | i in matches_in_class[c]])
-);
+%constraint forall(c in 1..nof_classes)(
+%    increasing([time_of_match[i] | i in matches_in_class[c]])
+%);
+
+% --- Within each round: matches are non-decreasing (optional) ---
+constraint
+    forall(r in 1..nof_rounds)(
+        increasing([time_of_match[m] | m in matches_in_round[r]])
+    );
+
+% --- Between consecutive rounds in the same class: strict increase ---
+constraint
+    forall(c in 1..nof_classes, r in 1..nof_rounds-1 where
+        class_of_match[round_index[r]] == c /\ class_of_match[round_index[r+1]] == c
+    )(
+        max_match_time_in_round[r] < min_match_time_in_round[r+1]
+    );
+
+% anchor
+constraint
+    forall(r in 1..nof_rounds)(
+        time_of_match[min(matches_in_round[r])] = min_match_time_in_round[r]
+    );
+
 
 %constraint forall (c in 1..nof_classes) (
  %   forall (i in 1..(card(matches_in_class[c]) - 1)) (
@@ -178,7 +203,7 @@ constraint forall(i, j in 1..(nof_umpire_matches) where i < j) (
 
 constraint 
     forall(c in 1..nof_classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        abs(time_of_match[min_match_index_in_round[r + 1]] - time_of_match[max_match_index_in_round[r]]) >= 4
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 4
     );
 
 %constraint 
@@ -201,9 +226,9 @@ constraint
 constraint
     forall(c in (nof_elit_classes+1)..nof_classes, r in (nof_elit_rounds+1)..nof_rounds)(
         if card(matches_in_round[r]) > 4 then
-            abs(time_of_match[max_match_index_in_round[r]] - time_of_match[min_match_index_in_round[r]]) < 3
+            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 3
         else
-            abs(time_of_match[max_match_index_in_round[r]] - time_of_match[min_match_index_in_round[r]]) < 2
+            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 2
         endif
     );
 
@@ -245,42 +270,82 @@ constraint
 
 % Semi-finals and finals on day 2 only for classes with 5 or more rounds
 constraint
-    forall(c in 1..nof_classes where 
-        card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c}) >= 5
+    forall(c in 1..nof_elit_classes
     )(
         forall(i in matches_in_class[c] where is_semi_or_final(i, c)) (
             time_of_match[i] > last_of_day1
         )
     );
+    
 
+
+% switch constraint to domain narrowing
+% Tighten domains of finals in elit classes to be strictly after last_of_day1
+
+
+%constraint
+ %   forall(c in 1..nof_classes where 
+  %      card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c}) >= 5
+   % )(
+    %    forall(i in matches_in_class[c] where is_semi_or_final(i, c)) (
+     %       time_of_match[i] > last_of_day1
+      %  )
+    %);
 
 
 % solve :: int_search(matches, first_fail, indomain_min, complete) satisfy;
 
 % Block any round from beeing split between two days
+%constraint
+%    (forall(r in 1..nof_rounds)(
+%        forall(m in matches_in_round[r])(time_of_match[m] <= last_of_day1)
+%    \/
+%        forall(m in matches_in_round[r])(time_of_match[m] > last_of_day1)
+%    ));
+
+%constraint
+%    (forall(r in 1..nof_rounds)(
+%        forall(m in matches_in_round[r])(time_of_match[m] <= last_of_day0)
+%    \/
+%        forall(m in matches_in_round[r])(time_of_match[m] > last_of_day0)
+%    ));
+
 constraint
     (forall(r in 1..nof_rounds)(
-        forall(m in matches_in_round[r])(time_of_match[m] <= last_of_day1)
+        (max_match_time_in_round[r] <= last_of_day1)
     \/
-        forall(m in matches_in_round[r])(time_of_match[m] > last_of_day1)
+        (min_match_time_in_round[r] > last_of_day1)
     ));
 
 constraint
     (forall(r in 1..nof_rounds)(
-        forall(m in matches_in_round[r])(time_of_match[m] <= last_of_day0)
+        (max_match_time_in_round[r] <= last_of_day0)
     \/
-        forall(m in matches_in_round[r])(time_of_match[m] > last_of_day0)
+        (min_match_time_in_round[r] > last_of_day0)
     ));
 
 
-constraint (min(time_of_match) == 1);
+constraint exists(m in 1..nof_matches)(
+    time_of_match[m] == last_of_day0 + 1
+);
+
+% max fields matches per timeslot
+%constraint forall(ts in 1..timeslots)(
+%    sum([bool2int(time_of_match[m] == ts) | m in 1..nof_matches]) <= fields
+%);
 
 % All adjecent timeslots can max have filed amount of matches
-constraint
-    forall(ts in 1..timeslots - 1)(
-        sum([ bool2int(time_of_match[m] == ts \/ time_of_match[m] == ts + 1)
-            | m in 1..nof_matches ]) <= fields
-    );
+%constraint
+%    forall(ts in 1..timeslots - 1)(
+%        sum([ bool2int(time_of_match[m] == ts \/ time_of_match[m] == ts + 1)
+%            | m in 1..nof_matches ]) <= fields
+%    );
+
+% The two constraints above combined into one cumulative
+array[1..nof_matches] of int: durations = [2 | _ in 1..nof_matches];  % Each match occupies 2 timeslots
+array[1..nof_matches] of int: resources = [1 | _ in 1..nof_matches];
+
+constraint cumulative(time_of_match, durations, resources, fields);
 
 % In classes with ≤ 3 rounds:
 %  all matches must start within (rounds-of-class * 8) timeslots
@@ -298,7 +363,7 @@ constraint
             (max_t - min_t + 1 <= nof_rounds_in_class * 10)
     );
 
-% In classes with <= 4 rounds
+% In classes with <= 3 rounds
 % All rounds should be played on the same day
 constraint
     forall(c in 1..nof_classes where 
@@ -310,7 +375,7 @@ constraint
             var int: max_t = max([ time_of_match[m] | m in mc ]),
             int: nof_rounds_in_class = card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c})
         } in
-            (forall(m in mc)(time_of_match[m] <= last_of_day1) \/ forall(m in mc)(time_of_match[m] > last_of_day1))
+            (max([time_of_match[m] | m in mc]) <= last_of_day1 \/ min([time_of_match[m] | m in mc]) > last_of_day1)
     );
 
 % In classes with > 3 rounds
@@ -329,4 +394,4 @@ constraint
     );
 
 
-solve minimize max(time_of_match)
+solve minimize (max(time_of_match) - min(time_of_match))
