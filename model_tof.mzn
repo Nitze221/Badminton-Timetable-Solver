@@ -257,18 +257,18 @@ constraint
 %    );
 
 % non elite
-%constraint 
-%    forall(c in (nof_elit_classes+1)..nof_classes, r in (nof_elit_rounds+1)..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-%        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 4
-%    );
-
-constraint
-    forall(c in (nof_elit_classes+1)..nof_classes)(
-        disjunctive(
-            [min_match_time_in_round[r] | r in rounds_in_class[c] intersect (nof_elit_rounds+1)..nof_rounds],
-            [max_match_time_in_round[r] - min_match_time_in_round[r] + 4 | r in rounds_in_class[c] intersect (nof_elit_rounds+1)..nof_rounds]
-        )
+constraint 
+    forall(c in (nof_elit_classes+1)..nof_classes, r in (nof_elit_rounds+1)..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 4
     );
+
+%constraint
+%    forall(c in (nof_elit_classes+1)..nof_classes)(
+%        disjunctive(
+%            [min_match_time_in_round[r] | r in rounds_in_class[c] intersect (nof_elit_rounds+1)..nof_rounds],
+%            [max_match_time_in_round[r] - min_match_time_in_round[r] + 4 | r in rounds_in_class[c] intersect (nof_elit_rounds+1)..nof_rounds]
+%        )
+%    );
 
 % elite not needed, we want more strict rule, which holds for all umpire matches, not just consecutive rounds
 %constraint 
@@ -326,7 +326,7 @@ constraint
        forall(r1 in rounds_in_class[strong_collision[i]],
                r2 in rounds_in_class[strong_collision[i+1]]) (
             max_match_time_in_round[r1] + 4 <= min_match_time_in_round[r2]
-            \/
+            xor
             max_match_time_in_round[r2] + 4 <= min_match_time_in_round[r1]
        )
     );
@@ -337,7 +337,7 @@ constraint
         forall(r1 in rounds_in_class[weak_collision[i]],
                r2 in rounds_in_class[weak_collision[i+1]]) (
             max_match_time_in_round[r1] + 3 <= min_match_time_in_round[r2]
-            \/
+            xor
             max_match_time_in_round[r2] + 3 <= min_match_time_in_round[r1]
        )
     );
@@ -348,7 +348,7 @@ constraint
         forall(r1 in rounds_in_class[super_weak_collision[i]],
                r2 in rounds_in_class[super_weak_collision[i+1]]) (
             max_match_time_in_round[r1] <= min_match_time_in_round[r2]
-            \/
+            xor
             max_match_time_in_round[r2] <= min_match_time_in_round[r1]
        )
     );
