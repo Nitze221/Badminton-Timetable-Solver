@@ -239,7 +239,7 @@ constraint forall(r in 1..nof_rounds, i in matches_in_round[r]) (
 constraint
     cumulative(
         [time_of_match[um] | um in umpire_matches],
-        [2 | um in umpire_matches],       % each umpire match spans 2 consecutive slots (gap)
+        [3 | um in umpire_matches],       % each umpire match spans 3 consecutive slots (gap)
         [1 | um in umpire_matches],       % each uses 1 unit of resource capacity
         5                                 % at most 5 umpire matches simultaneously (chairs)
     );
@@ -259,7 +259,13 @@ constraint
 % non elite
 constraint 
     forall(c in (nof_elit_classes+1)..nof_classes, r in (nof_elit_rounds+1)..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 4
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 8
+    );
+
+% elite
+constraint 
+    forall(c in 1..nof_elit_classes, r in 1..nof_elit_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 8
     );
 
 %constraint
@@ -304,7 +310,7 @@ constraint
 constraint
     forall(r in 1..nof_elit_rounds)(
         if card(matches_in_round[r]) > 4 then
-            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 7
+            (max_match_time_in_round[r] - min_match_time_in_round[r]) < (((card(matches_in_round[r]) - 1) div 5) + 1) * 3
         else
             (max_match_time_in_round[r] - min_match_time_in_round[r]) < 2
         endif
@@ -325,9 +331,10 @@ constraint
     forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
        forall(r1 in rounds_in_class[strong_collision[i]],
                r2 in rounds_in_class[strong_collision[i+1]]) (
-            max_match_time_in_round[r1] + 4 <= min_match_time_in_round[r2]
-            xor
-            max_match_time_in_round[r2] + 4 <= min_match_time_in_round[r1]
+            (max_match_time_in_round[r1] + 4 <= min_match_time_in_round[r2])
+            +
+            (max_match_time_in_round[r2] + 4 <= min_match_time_in_round[r1])
+            = 1
        )
     );
 
@@ -336,9 +343,10 @@ constraint
     forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
         forall(r1 in rounds_in_class[weak_collision[i]],
                r2 in rounds_in_class[weak_collision[i+1]]) (
-            max_match_time_in_round[r1] + 3 <= min_match_time_in_round[r2]
-            xor
-            max_match_time_in_round[r2] + 3 <= min_match_time_in_round[r1]
+            (max_match_time_in_round[r1] + 3 <= min_match_time_in_round[r2])
+            +
+            (max_match_time_in_round[r2] + 3 <= min_match_time_in_round[r1])
+            = 1
        )
     );
 
@@ -347,9 +355,10 @@ constraint
     forall(i in 1..nof_super_weak_collisions where i mod 2 == 1) (
         forall(r1 in rounds_in_class[super_weak_collision[i]],
                r2 in rounds_in_class[super_weak_collision[i+1]]) (
-            max_match_time_in_round[r1] <= min_match_time_in_round[r2]
-            xor
-            max_match_time_in_round[r2] <= min_match_time_in_round[r1]
+            (max_match_time_in_round[r1] <= min_match_time_in_round[r2])
+            +
+            (max_match_time_in_round[r2] <= min_match_time_in_round[r1])
+            = 1
        )
     );
 
@@ -437,7 +446,7 @@ constraint exists(m in 1..nof_matches)(
 %    sum([bool2int(time_of_match[m] == ts) | m in 1..nof_matches]) <= fields
 %);
 
-% All adjecent timeslots can max have filed amount of matches
+% All adjecent timeslots can max have field amount of matches
 constraint
     forall(ts in 1..timeslots - 1)(
         sum([ bool2int(time_of_match[m] == ts \/ time_of_match[m] == ts + 1)
