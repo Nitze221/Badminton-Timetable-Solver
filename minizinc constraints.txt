@@ -1,0 +1,48 @@
+A matches ID is its index in the "matches" list. 
+All matches that need an umpire take 45 min. 
+All other matches take 30 min. 
+timeslots is a list that is as long as there are start-times for matches. 
+There are enough time slots for all matches and more. 
+Each match chould be played once. fields is an int that is the amount of matches that may start on the same timeslot.
+timeslots = number of start times (each 15 minutes long). So an umpire match takes up 3 time slots and all other matches take up 2
+
+For strong collisions: there needs to be 1 hour between the start times of the colliding matches. 
+For weak collisions: there needs to be 45 min between the start times of the colliding matches.
+
+The input array[1..nof_weak_collisions] of int: weak_collision; that the minizinc program gets is a list [1, 8, 2, 8, 7, 8] that has an even amount of values. These values represent classes. 
+Each match belongs to some class and classes collide, i.e. all matches in colliding classes need to follow the above stated rules.
+
+Matches within a class are further sectioned into rounds. 
+All matches in each round should have start time within 45 min of each other, so their start times can span over three time slots. 
+All rounds in the same class needs to have at least 60 min inbetween eachother, i.e. the last match in round 1, class 1 needs to start 60 min before the first match in round 2, class 1 starts. 
+
+Here are helper functions:
+% check if a match is in a class function bool: 
+in_class(int: match, int: class) = (
+    match >= class_index[class] /\ (class == nof_classes \/ match < class_index[class + 1])
+    );
+
+% check if a match is in a round
+function bool: in_round(int: match, int: iround) = 
+    (match >= round_index[iround] /\ (iround == nof_rounds \/ match < round_index[iround + 1]));
+
+
+% Returns all matches in a class
+array[1..nof_classes] of set of int: matches_in_class =
+    [ if c < nof_classes then
+          class_index[c] .. class_index[c+1] - 1
+      else
+          class_index[c] .. nof_matches
+      endif
+      | c in 1..nof_classes
+    ];
+
+% Returns all matches in a round
+array[1..nof_rounds] of set of int: matches_in_round =
+    [ if r < nof_rounds then
+          round_index[r] .. round_index[r+1] - 1
+      else
+          round_index[r] .. nof_matches
+      endif
+      | r in 1..nof_rounds
+    ];
