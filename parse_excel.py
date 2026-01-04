@@ -22,7 +22,8 @@ def parse_competition_excel(file_path, event_codes):
         if pd.notna(col_a):
             cell_text = str(col_a).strip()
             if cell_text.lower().endswith("main draw"):     # we ignore all events that are not the main draw
-                current_event = str(col_a)[11:15].strip()
+                words = str(col_a)[11:].split()
+                current_event = " ".join(words[:2])
                 current_player = None
             else:
                 current_event = None
@@ -42,19 +43,6 @@ def parse_competition_excel(file_path, event_codes):
             if current_event:
                 event_players[current_event].add(current_player)
                 player_events[current_player].add(current_event)
-
-        # Detect player’s events in column D
-        #if pd.notna(col_d) and current_player:
-
-         #   if str(col_d).strip().lower() == "[withdrawn]":
-          #      continue
-           # if "[withdrawn]" in str(col_d).strip().lower():
-            #    current_player = None
-             #   continue
-
-            #event_code = str(col_d)[:4].strip()
-            #if event_code and event_code[0].upper() in event_codes:
-             #   player_events[current_player].add(event_code)
 
     # Build cross-event participation summary
     event_correlations = {}
@@ -96,59 +84,113 @@ def analyze_collisions(event_correlations):
 
     return strong_collision, weak_collision, super_weak_collision
 
-def calculate_elimination_rounds(event_players):
-    elimination_structure = {}
-    participants_structure = {}
+def calculate_tournament_structure(event_players):
+    event_structures = {}
+    round_schedules = {}
 
     for event, players in event_players.items():
         player_count = len(players)
-        if player_count == 0:
-            continue
+        event_type = event[1].upper() if len(event) > 1 else "S"
+        participants = player_count // (2 if event_type == "D" else 1)
 
-        # Determine singles or doubles
-        event_type = event[1].upper() if len(event) > 1 else None
-
-        if event_type == "S":
-            participants = player_count
-        elif event_type == "D":
-            participants = player_count // 2
-            if player_count % 2 != 0:
-                print(f"⚠️ Warning: Event {event} has an odd number of players ({player_count}), one will be left out.")
-        else:
-            print(f"⚠️ Warning: Event {event} has unknown type — skipping.")
-            continue
-
-        participants_structure[event] = participants
-
-        # Compute number of matches per round
-        rounds = []
-
-        # If number of participants is 1, no matches
         if participants <= 1:
-            elimination_structure[event] = []
+            event_structures[event] = {"round_robin": [], "elimination": [], "lower_playoff": []}
+            round_schedules[event] = []
             continue
 
-        # Find the smallest power of 2 that is >= participants
-        x = math.ceil(math.log2(participants))
-
-        # Determine first round matches
-        half = participants / 2
-        if 2 ** x == half:
-            first_round = int(2 ** x)
+        # --- 1. Partition into Round Robin Groups ---
+        if participants <= 5:
+            groups = [participants]
         else:
-            first_round = int(participants - 2 ** (x - 1))
+            best_groups = None
+            min_matches = float('inf')
+            for y in range((participants // 4) + 1):
+                rem = participants - (y * 4)
+                if rem >= 0 and rem % 3 == 0:
+                    x = rem // 3
+                    total_m = (x * 3) + (y * 6)
+                    if total_m < min_matches:
+                        min_matches = total_m
+                        best_groups = [3] * x + [4] * y
+            groups = best_groups
 
-        rounds.append(first_round)
+        # --- 2. RR Matches per Round ---
+        rr_rounds = []
+        max_rr_rounds = max((g if g % 2 != 0 else g - 1) for g in groups)
+        for r in range(max_rr_rounds):
+            m = sum(g // 2 for g in groups if r < (g if g % 2 != 0 else g - 1))
+            rr_rounds.append(m)
 
-        # Subsequent rounds (each halving matches)
-        matches = 2 ** (x - 2)
-        while matches >= 1:
-            rounds.append(matches)
-            matches //= 2
+        # --- 3. Elimination Rounds Logic ---
+        upper_elim = []
+        lower_elim = []
+        
+        if participants > 5:
+            # Determine how many advance based on Class (A or V)
+            # We look for A or V at the end of the event name or specific class markers
+            is_elite_class = any(cls in event for cls in [" A", " V"])
 
-        elimination_structure[event] = rounds
+            is_bronze_event = any(event.endswith(s) for s in ["9", "11", "13"])
+            
+            # Upper: Top 1 for Elite and A (A/V), Top 2 for others
+            advancing_per_group = 1 if is_elite_class else 2
+            upper_count = len(groups) * advancing_per_group
 
-    return elimination_structure, participants_structure
+            # Calculate Upper Elim (including Bronze match if applicable)
+            upper_elim = self_calculate_elim(upper_count, has_bronze=is_bronze_event)
+
+            # Lower: Everyone else (only if event ends in 9, 11, or 13)
+            if is_bronze_event:
+                lower_count = participants - upper_count
+                if lower_count > 1:
+                    lower_elim = self_calculate_elim(lower_count)
+
+        # --- 4. Merge Playoff Rounds (Simultaneous Play) ---
+        playoff_rounds = []
+        num_playoff_rounds = max(len(upper_elim), len(lower_elim))
+        
+        for i in range(num_playoff_rounds):
+            m_upper = upper_elim[i] if i < len(upper_elim) else 0
+            m_lower = lower_elim[i] if i < len(lower_elim) else 0
+            playoff_rounds.append(m_upper + m_lower)
+
+        # --- 5. Package Results ---
+        event_structures[event] = {
+            "round_robin": groups,
+            "elimination": upper_elim,
+            "lower_playoff": lower_elim
+        }
+        round_schedules[event] = rr_rounds + playoff_rounds
+
+    return event_structures, round_schedules
+
+def self_calculate_elim(n, has_bronze=False):
+    """Calculates elimination matches, adding 1 to the final round for Bronze match."""
+    if n <= 1: return []
+    rounds = []
+    x = math.ceil(math.log2(n))
+    
+    # First round (Play-ins)
+    if 2**x == (n / 2):
+        first = int(2**x)
+    else:
+        first = int(n - 2**(x - 1))
+    rounds.append(first)
+    
+    # Subsequent rounds
+    matches = 2 ** (x - 2)
+    while matches >= 1:
+        rounds.append(matches)
+        matches //= 2
+    
+    # Add Bronze Match: If has_bronze is True and there were at least 4 players 
+    # (semi-finals), add +1 to the very last round (the Final).
+    if has_bronze and n >= 4 and len(rounds) > 0:
+        rounds[-1] += 1
+        
+    return rounds
+
+
 
 def check_rule_violations(player_events):
     warnings = []
@@ -157,6 +199,7 @@ def check_rule_violations(player_events):
         events = list(events)
 
         # Rule 1: If playing a V event, no other event with same prefix
+        '''
         v_prefixes = {e[:2] for e in events if e.endswith("V")}
         for prefix in v_prefixes:
             conflicting = [e for e in events if e.startswith(prefix) and not e.endswith("V")]
@@ -165,12 +208,14 @@ def check_rule_violations(player_events):
                     f"⚠️ {player}: plays {', '.join([e for e in events if e.startswith(prefix) and e.endswith('V')])}, "
                     f"so cannot play {', '.join(conflicting)}"
                 )
+        '''
 
         # Rule 2: No more than 3 total events
         if len(events) > 3:
             warnings.append(f"⚠️ {player}: participates in {len(events)} events ({', '.join(events)})")
 
         # Rule 3: No more than two non-V events with same prefix
+        '''
         non_v_events = [e for e in events if not e.endswith("V")]
         prefix_counts = {}
         for e in non_v_events:
@@ -183,13 +228,16 @@ def check_rule_violations(player_events):
                 warnings.append(
                     f"⚠️ {player}: plays {count} events with prefix '{prefix}' ({', '.join(same_prefix_events)})"
                 )
+        '''
 
         # Rule 4: No 3+ events with second character D
+        '''
         d_class_events = [e for e in events if len(e) > 1 and e[1].upper() == "D"]
         if len(d_class_events) >= 3:
             warnings.append(
                 f"⚠️ {player}: plays {len(d_class_events)} doubles classes ({', '.join(d_class_events)})"
             )
+        '''
 
     return warnings
 
@@ -197,16 +245,7 @@ def find_problematic_players(player_events, event_players, event_correlations):
     problematic_players = {}
     checked_pairs = set()  # to avoid duplicate collision reports
     
-    # Condition 1: Players in 3+ events
-    '''
-    for player, events in player_events.items():
-        if len(events) >= 3:
-            problematic_players.setdefault(player, []).append(
-                f"Plays in {len(events)} events: {', '.join(sorted(events))}"
-            )
-    '''
-
-    # Condition 2: Sole collision cause
+    # Sole collision cause
     for event, collisions in event_correlations.items():
         for other_event, _ in collisions:
             # Normalize pair so ("MS V", "XD A") == ("XD A", "MS V")
@@ -264,62 +303,77 @@ def write_player_events_to_excel(file_path, player_events, problematic_players, 
 
     print(f"✅ Added players to '{sheet_name}' in {file_path}")
 
-def write_event_analysis_to_excel(file_path, event_correlations, elimination_data, event_players, sheet_name="Event Analysis"):
+
+
+def write_event_analysis_to_excel(file_path, event_correlations, round_schedules, event_structures, event_players, sheet_name="Event Analysis"):
     """
-    Adds/updates a sheet showing event collisions and elimination round info.
+    Updates the analysis sheet with a gap column and the RR/Elim/Lower 
+    elements joined by ", " (no brackets).
     """
     
+    # 1. Calculate the layout based on max rounds
     max_rounds = 0
-    for _, rounds in elimination_data.items():
-        max_rounds = max(max_rounds, len(rounds))
+    if round_schedules:
+        max_rounds = max(len(rounds) for rounds in round_schedules.values())
+    
+    # Define Column Indices
+    # Gap is at 4 + max_rounds
+    rr_col = 5 + max_rounds
+    elim_col = 6 + max_rounds
+    lower_col = 7 + max_rounds
 
     book = load_workbook(file_path)
-
-    # Create sheet if missing
     if sheet_name not in book.sheetnames:
         sheet = book.create_sheet(sheet_name)
-        headers = ["Event", "Collides With", "Player amount"] + [f"Round {i+1}" for i in range(max_rounds)]
-        sheet.append(headers)
+    else:
+        sheet = book[sheet_name]
 
-    sheet = book[sheet_name]
+    # 2. Write Headers
+    headers_base = ["Event", "Collides With", "Player amount"]
+    round_headers = [f"Round {i+1}" for i in range(max_rounds)]
+    
+    for i, h in enumerate(headers_base + round_headers, 1):
+        sheet.cell(row=1, column=i).value = h
+    
+    sheet.cell(row=1, column=rr_col).value = "RR"
+    sheet.cell(row=1, column=elim_col).value = "Elim"
+    sheet.cell(row=1, column=lower_col).value = "Lower"
 
-    # Clear only the data area (keep headers & formatting)
-    for row in sheet.iter_rows(min_row=2, max_col= (3 + max_rounds)):
+    # 3. Clear data area (up to the last new column)
+    for row in sheet.iter_rows(min_row=2, max_col=lower_col):
         for cell in row:
             cell.value = None
 
-    # Write new data
+    # 4. Write new data
     current_row = 2
     for event, collisions in event_correlations.items():
-        # Fetch rounds info
-        if event not in elimination_data or not (isinstance(elimination_data[event], list)):
-            print("‼ ERROR ‼ : the rounds for the event could not be attained")
-            break
-        rounds = elimination_data[event]
-
-        # Fetch player amount
-        player_amount = len(event_players[event])
-
-        # Event name
         sheet.cell(row=current_row, column=1).value = event
-
-        # Collisions
         sheet.cell(row=current_row, column=2).value = ", ".join(
             [f"{other} ({count})" for other, count in collisions]
         )
+        sheet.cell(row=current_row, column=3).value = len(event_players.get(event, []))
 
-        # Player amounts
-        sheet.cell(row=current_row, column=3).value = player_amount
+        # Round match counts
+        rounds = round_schedules.get(event, [])
+        for i, match_count in enumerate(rounds):
+            sheet.cell(row=current_row, column=4 + i).value = match_count
 
-        # Rounds in separate cells
-        for i, match_count in enumerate(rounds, start=4):
-            sheet.cell(row=current_row, column=i).value = match_count
+        # Structure columns with custom formatting (no brackets)
+        if event in event_structures:
+            struct = event_structures[event]
+            
+            # Helper to join elements by ", " instead of str(list)
+            def fmt_list(lst):
+                return ", ".join(map(str, lst)) if lst else ""
+
+            sheet.cell(row=current_row, column=rr_col).value = fmt_list(struct.get("round_robin"))
+            sheet.cell(row=current_row, column=elim_col).value = fmt_list(struct.get("elimination"))
+            sheet.cell(row=current_row, column=lower_col).value = fmt_list(struct.get("lower_playoff"))
 
         current_row += 1
     
     book.save(file_path)
-
-    print(f"✅ Added events to '{sheet_name}' sheet in {file_path}")
+    print(f"✅ Analysis updated. Data formatted as requested (no brackets).")
 
 def log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations"):
     """
@@ -377,29 +431,43 @@ def half_hour_slots(start_datetime: str, end_datetime: str):
 
 def minizinc_data(print_lists = True):
 
-    file_path = "Officiall entries 2.xlsx"  # <-- your Excel file
-    # file_path = "Entries HBC Premier Elite 2024 copy.xlsx"  # <-- your Excel file
-    event_codes = {"W", "M", "X"}
+    file_path = "Entries Dubbelturnering 2026 1.1.xlsx"  # <-- Excel file
+    event_codes = {"W", "M", "X", "B", "G"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision, super_weak_collision = analyze_collisions(event_correlations)
-    elimination_data, participants_structure = calculate_elimination_rounds(event_players)
+    event_structures, round_schedules = calculate_tournament_structure(event_players)
+
+    # Time slots that can hold matches (15 min)
     day_zero = half_hour_slots("2025-10-10 18:00", "2025-10-10 21:00") * 2 - 1
     day_one = half_hour_slots("2025-10-10 09:00", "2025-10-10 21:00") * 2 - 1
-    day_two = half_hour_slots("2025-10-10 09:00", "2025-10-10 17:00") * 2 - 1
+    day_two_1 = half_hour_slots("2025-10-10 09:00", "2025-10-10 10:00") * 2 - 1
+    day_two_2 = half_hour_slots("2025-10-10 10:30", "2025-10-10 14:00") * 2 - 1
+    day_two_3 = half_hour_slots("2025-10-10 14:30", "2025-10-10 19:00") * 2 - 1
 
-    # Matchslots can be made in a similar way as matches in the future if there is a varying amount of fields per timeslot.
-    # for now assume constant amount of fields
-    timeslots = day_zero + day_one + day_two
-    #timeslots = 
-    fields = 10
-    matchslots = timeslots * fields
-    last_of_day1 = (day_zero + day_one)
+    # The tree different time slots based on how many fields are available
+    timeslots_12_fields = day_zero + day_one + day_two_1
+    timeslots_8_fields = day_two_2
+    timeslots_6_fields = day_two_3
+
+    # amount of fields
+    fields_1 = 12
+    fields_2 = 8
+    fields_3 = 6
+
+    # amount of matchslots
+    matchslots_1 = timeslots_12_fields * fields_1
+    matchslots_2 = timeslots_8_fields * fields_2
+    matchslots_3 = timeslots_6_fields * fields_3
+
+    # the last slots of day 0 and first of day 1
     last_of_day0 = day_zero
+    last_of_day1 = (day_zero + day_one)
+    
 
     # 2d list where index is class and element is list of matches (size = rounds)
-    elimination_data_minizinc = [i[1] for i in elimination_data.items()]
+    elimination_data_minizinc = [i[1] for i in round_schedules.items()]
 
-    event_number_dict = {i[1]: i[0] + 1 for i in enumerate(elimination_data.keys())}
+    event_number_dict = {i[1]: i[0] + 1 for i in enumerate(round_schedules.keys())}
 
     number_event_dict = {x[1]: x[0] for x in event_number_dict.items()}
 
@@ -443,18 +511,15 @@ def minizinc_data(print_lists = True):
                 seen_pairs.add(key)
                 super_weak_collision_minizinc.extend([a, b])
 
-    #weak_collision_minizinc = [item for i, (_, values) in enumerate(weak_collision.items())
-     #   for v in values
-      #  for item in (i + 1, event_to_number(v[0]))]
-
-    #super_weak_collision_minizinc = [item for i, (_, values) in enumerate(super_weak_collision.items())
-     #   for v in values
-      #  for item in (i + 1, event_to_number(v[0]))]
 
     matches_minizic = []
-    umpire_matches = []
-    matches_no_umpire = []
+    V_matches = []
+    A_matches = []
+    junior_matches = []
+    matches_rest = []
     is_elite_match = False
+    is_A_match = False
+    is_junior_match = False
     class_index = []
     round_index = []
     first_singles_round_M = []
@@ -462,34 +527,145 @@ def minizinc_data(print_lists = True):
     first_singles_round_W = []
     first_doubles_mixt_round_W = []
 
+    # fix so it counts!!!
+    # start_of_V_classes = 0 good to have later
+    nof_V_classes = 0
+    nof_A_classes = 0
+    nof_junior_classes = 0
+    nof_rest_classes = 0
+
+    
+    # Iterate through the event names in the event_players dictionary
+    for event_name in event_players.keys():
+        # 1. Check for V classes (ending with V)
+        if event_name.endswith("V"):
+            nof_V_classes += 1
+            
+        # 2. Check for A classes (ending with A)
+        elif event_name.endswith("A"):
+            nof_A_classes += 1
+            
+        # 3. Check for Junior classes (containing U9, U11, or U13)
+        # Using 'in' is safer here in case the name is 'BS U13' or 'BS U13 '
+        elif any(jr in event_name for jr in ["U9", "U11", "U13"]):
+            nof_junior_classes += 1
+            
+        # 4. Everything else
+        else:
+            nof_rest_classes += 1
+    
+
+    # Initialize index trackers for when the special classes start and end
+    V_range = {"start": 0, "end": 0}
+    A_range = {"start": 0, "end": 0}
+    junior_range = {"start": 0, "end": 0}
+
+    # Initialize index trackers for when the special rounds start and end
+    V_rounds_range = {"start": 0, "end": 0}
+    A_rounds_range = {"start": 0, "end": 0}
+    junior_rounds_range = {"start": 0, "end": 0}
+
     count = 1
     class_nr = 1
+    round_counter = 1
+    
 
     for outer in elimination_data_minizinc:
         is_elite_match = False
+        is_A_match = False
+        is_junior_match = False
+
         class_index.append(count)
-        if number_event_dict[class_nr].endswith("V"):
+
+        current_event_name = number_event_dict[class_nr]
+
+        if current_event_name.endswith("V"):
             is_elite_match = True
+            if V_range["start"] == 0: V_range["start"] = class_nr
+            V_range["end"] = class_nr
+
+        elif current_event_name.endswith("A"):
+            is_A_match = True
+            if A_range["start"] == 0: A_range["start"] = class_nr
+            A_range["end"] = class_nr
+
+        elif any(current_event_name.endswith(s) for s in ["9", "11", "13"]):
+            is_junior_match = True
+            if junior_range["start"] == 0: junior_range["start"] = class_nr
+            junior_range["end"] = class_nr
+        
         for inner in outer:
+            # --- Round Tracking Logic ---
+            if is_elite_match:
+                if V_rounds_range["start"] == 0: V_rounds_range["start"] = round_counter
+                V_rounds_range["end"] = round_counter
+            elif is_A_match:
+                if A_rounds_range["start"] == 0: A_rounds_range["start"] = round_counter
+                A_rounds_range["end"] = round_counter
+            elif is_junior_match:
+                if junior_rounds_range["start"] == 0: junior_rounds_range["start"] = round_counter
+                junior_rounds_range["end"] = round_counter
+
+            round_counter += 1
+
             round_index.append(count)
             for _ in range(0, inner):
                 if is_elite_match:
-                    umpire_matches.append(count)
+                    V_matches.append(count)
+                elif is_A_match:
+                    A_matches.append(count)
+                elif is_junior_match:
+                    junior_matches.append(count)
                 else:
-                    matches_no_umpire.append(count)
+                    matches_rest.append(count)
                 matches_minizic.append(count)
                 count += 1
-        if number_event_dict[class_nr].endswith("A"):
-            umpire_matches.append(count - 1) # last match was "A" final
-            matches_no_umpire = matches_no_umpire[:-1]
         class_nr += 1
+
+    # --- Validation Logic ---
+    # Helper to validate: (end - start + 1) should equal the count we found earlier
+    validations = [
+        ("V", V_range, nof_V_classes),
+        ("A", A_range, nof_A_classes),
+        ("Junior", junior_range, nof_junior_classes)
+    ]
+
+    for label, r, expected in validations:
+        actual = (r["end"] - r["start"] + 1) if r["start"] != 0 else 0
+        if actual != expected:
+            print(f"⚠️  WARNING: {label} class mismatch! Range {r['start']}-{r['end']} "
+                f"suggests {actual} classes, but {expected} were expected.")
+    # --- Validation Logic ---
     
-    nof_elit_classes = 5
-    nof_elit_rounds = sum(len(arr) for arr in elimination_data_minizinc[:nof_elit_classes])
+    # number of rounds for the special classes
+    nof_junior_rounds = sum(len(arr) for arr in elimination_data_minizinc[junior_range["start"]-1 : junior_range["end"]])
+    nof_V_rounds = sum(len(arr) for arr in elimination_data_minizinc[V_range["start"]-1 : V_range["end"]])
+    nof_A_rounds = sum(len(arr) for arr in elimination_data_minizinc[A_range["start"]-1 : A_range["end"]])
     
     if print_lists:
         print("TIMESLOTS:")
-        print(timeslots, end='\n\n')
+        print(timeslots_12_fields, end='\n')
+        print(timeslots_8_fields, end='\n')
+        print(timeslots_6_fields, end='\n\n')
+
+        print("NUMBER OF V EVENTS:")
+        print(nof_V_classes, end='\n')
+        print("NUMBER OF A EVENTS:")
+        print(nof_A_classes, end='\n')
+        print("NUMBER OF JUNIOR (U9, U11, U13) EVENTS:")
+        print(nof_junior_classes, end='\n')
+        print("NUMBER OF REMAINING EVENTS:")
+        print(nof_rest_classes, end='\n\n')
+
+        print("NUMBER OF V ROUNDS:")
+        print(nof_V_rounds, end='\n')
+        print("NUMBER OF A ROUNDS:")
+        print(nof_A_rounds, end='\n')
+        print("NUMBER OF JUNIOR (U9, U11, U13) ROUNDS:")
+        print(nof_junior_rounds, end='\n\n')
+
+        print("\n\n")
+
         print("ELIMINATION DATA:")
         print(elimination_data_minizinc, end='\n\n')
         print("CLASS INDEXES:")
@@ -498,10 +674,10 @@ def minizinc_data(print_lists = True):
         print(round_index, end='\n\n')
         print("MATCHES:")
         print(matches_minizic, end='\n\n')
-        print("UMPIRE MATCHES:")
-        print(umpire_matches, end='\n\n')
-        print("MATCHES WITHOUT UMPIRE MATCHES:")
-        print(matches_no_umpire, end='\n\n')
+        #print("UMPIRE MATCHES:")
+        #print(umpire_matches, end='\n\n')
+        #print("MATCHES WITHOUT UMPIRE MATCHES:")
+        #print(matches_no_umpire, end='\n\n')
         print("STRONG COLLISION:")
         print(strong_collision, end='\n\n')
         print("STRONG COLLISION MINIZINC:")
@@ -514,52 +690,99 @@ def minizinc_data(print_lists = True):
         print(super_weak_collision, end="\n\n")
         print("SUPER WEAK COLLISION MINIZINC:")
         print(super_weak_collision_minizinc, end="\n\n")
-        print("AMOUNT OF ELITE ROUNDS")
-        print(nof_elit_rounds, end="\n\n")
+        #print("AMOUNT OF ELITE ROUNDS")
+        #print(nof_elit_rounds, end="\n\n")
 
     data = {
+        "file_path": file_path,
+
         "strong_collision": strong_collision_minizinc,
         "weak_collision": weak_collision_minizinc,
         "super_weak_collision": super_weak_collision_minizinc,
-        "matches": matches_minizic,
+
         "class_index": class_index,
         "round_index": round_index,
-        "timeslots": timeslots,
-        "fields": fields,
-        "matchslots": matchslots,
+
+        "timeslots_12_fields": timeslots_12_fields,
+        "timeslots_8_fields": timeslots_8_fields,
+        "timeslots_6_fields": timeslots_6_fields,
+
+        "fields_1": fields_1,
+        "fields_2": fields_2,
+        "fields_3": fields_3,
+
+        "matchslots_1": matchslots_1,
+        "matchslots_2": matchslots_2,
+        "matchslots_3": matchslots_3,
+
         "last_of_day1": last_of_day1,
         "last_of_day0": last_of_day0,
-        "file_path": file_path,
-        "umpire_matches": umpire_matches,
-        "matches_no_umpire": matches_no_umpire,
-        "nof_elit_rounds": nof_elit_rounds,
-        "nof_elit_classes": nof_elit_classes
+
+        "nof_V_classes": nof_V_classes,
+        "nof_A_classes": nof_A_classes,
+        "nof_junior_classes": nof_junior_classes,
+
+        "V_start": V_range["start"],
+        "V_end": V_range["end"],
+        "A_start": A_range["start"],
+        "A_end": A_range["end"],
+        "junior_start": junior_range["start"],
+        "junior_end": junior_range["end"],
+
+        "nof_V_rounds": nof_V_rounds,
+        "nof_A_rounds": nof_A_rounds,
+        "nof_junior_rounds": nof_junior_rounds,
+
+        "V_rounds_start": V_rounds_range["start"],
+        "V_rounds_end": V_rounds_range["end"],
+        "A_rounds_start": A_rounds_range["start"],
+        "A_rounds_end": A_rounds_range["end"],
+        "junior_rounds_start": junior_rounds_range["start"],
+        "junior_rounds_end": junior_rounds_range["end"],
+        
+        "matches": matches_minizic,
+        "V_matches": V_matches,
+        "A_matches": A_matches,
+        "junior_matches": junior_matches,
+        "matches_rest": matches_rest,
     }
 
     return data
 
 def main():
-    file_path = "Entries HBC Premier Elite 2024 copy.xlsx"  # <-- your Excel file
-    event_codes = {"W", "M", "X"}
+    file_path = "Entries Dubbelturnering 2026 1.1.xlsx"  # <-- your Excel file
+    event_codes = {"W", "M", "X", "B", "G"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision, super_weak_collision = analyze_collisions(event_correlations)
-    elimination_data, participants_structure = calculate_elimination_rounds(event_players)
+    event_structures, round_schedules = calculate_tournament_structure(event_players)
     rule_violations = check_rule_violations(player_events)
     problematic_players = find_problematic_players(player_events, event_players, event_correlations)
-    write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events")
-    write_event_analysis_to_excel(file_path, event_correlations, elimination_data, event_players, sheet_name="Event Analysis")
-    log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations")
+    #write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events")
+    #write_event_analysis_to_excel(file_path, event_correlations, round_schedules, event_structures, event_players, sheet_name="Event Analysis")
+    #log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations")
     time_slots = half_hour_slots("2025-10-10 09:00", "2025-10-10 13:30")
+
+    day_zero = half_hour_slots("2025-10-10 18:00", "2025-10-10 21:00") * 2 - 1
+    day_one = half_hour_slots("2025-10-10 09:00", "2025-10-10 21:00") * 2 - 1
+    day_two_1 = half_hour_slots("2025-10-10 09:00", "2025-10-10 10:00") * 2 - 1
+    day_two_2 = half_hour_slots("2025-10-10 10:30", "2025-10-10 14:00") * 2 - 1
+    day_two_3 = half_hour_slots("2025-10-10 14:30", "2025-10-10 15:00") * 2 - 1
+
+    print(str(day_zero))
+    print(str(day_one))
+    print(str(day_two_1))
+    print(str(day_two_2))
+    print(str(day_two_3))
     
 
     #print(str(time_slots))
 
     # Print all players for all events
-    '''
+    
     print("\n=== Event -> Players ===")
     for event, players in event_players.items():
         print(f"{event}: {sorted(players)}")
-    '''
+    
     # Print the amount of entries for all events
     '''
     print("\n=== Event -> num Players ===")
@@ -594,10 +817,15 @@ def main():
     '''
     # Print mathces per elimination round per event
     '''
-    print("\n=== Elimination rounds and matches per round ===")
-    for event, rounds in elimination_data.items():
+    print("\n=== Event structures ===")
+    for event, rounds in event_structures.items():
+        print(f"{event}: {rounds}")
+    
+    print("\n=== Rounds and matches per round ===")
+    for event, rounds in round_schedules.items():
         print(f"{event}: {rounds}")
     '''
+    
     # Print warnings related to players entries
     '''
     for warning in rule_violations:
