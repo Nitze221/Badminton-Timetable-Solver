@@ -62,13 +62,16 @@ def analyze_collisions(event_correlations):
     super_weak_collision = {}
 
     for event, correlations in event_correlations.items():
-        event_suffix = event[-1] if event else ""
+        event_parts = event.split()
+        event_suffix = event_parts[1] if len(event_parts) > 1 else ""
         same = []
         different_1 = []
         different_2 = []
 
         for other_event, count in correlations:
-            other_suffix = other_event[-1] if other_event else ""
+            other_parts = other_event.split()
+            other_suffix = other_parts[1] if len(other_parts) > 1 else ""
+
             if other_suffix == event_suffix:
                 same.append(other_event)
             else:
@@ -84,6 +87,7 @@ def analyze_collisions(event_correlations):
 
     return strong_collision, weak_collision, super_weak_collision
 
+'''
 def calculate_tournament_structure(event_players):
     event_structures = {}
     round_schedules = {}
@@ -190,7 +194,131 @@ def self_calculate_elim(n, has_bronze=False):
         
     return rounds
 
+'''
 
+
+def calculate_tournament_structure(event_players, pools=False):
+    event_structures = {}
+    round_schedules = {}
+
+    for event, players in event_players.items():
+        player_count = len(players)
+        event_type = event[1].upper() if len(event) > 1 else "S"
+        participants = player_count // (2 if event_type == "D" else 1)
+
+        if participants <= 1:
+            event_structures[event] = {"round_robin": [], "elimination": [], "lower_playoff": []}
+            round_schedules[event] = []
+            continue
+
+        groups = []
+        rr_rounds = []
+        upper_elim = []
+        lower_elim = []
+
+        # --- 1. Determine Structure (Force RR for 3 or 4 participants) ---
+        # If user requested pools OR if there are exactly 3 or 4 participants
+        use_round_robin = pools or participants in [3, 4]
+
+        if use_round_robin:
+            if participants <= 5:
+                groups = [participants]
+            else:
+                # Standard partitioning for larger pools
+                best_groups = None
+                min_matches = float('inf')
+                for y in range((participants // 4) + 1):
+                    rem = participants - (y * 4)
+                    if rem >= 0 and rem % 3 == 0:
+                        x = rem // 3
+                        total_m = (x * 3) + (y * 6)
+                        if total_m < min_matches:
+                            min_matches = total_m
+                            best_groups = [3] * x + [4] * y
+                groups = best_groups
+
+            # Calculate RR Matches per Round
+            if groups:
+                max_rr_rounds = max((g if g % 2 != 0 else g - 1) for g in groups)
+                for r in range(max_rr_rounds):
+                    m = sum(g // 2 for g in groups if r < (g if g % 2 != 0 else g - 1))
+                    rr_rounds.append(m)
+
+        # --- 2. Elimination Logic ---
+        is_elite_class = any(cls in event for cls in [" A", " V"])
+        is_bronze_event = any(event.endswith(s) for s in ["9", "11", "13"])
+
+        # If we used Round Robin and have more than 4 participants, 
+        # or if pools was explicitly True, we calculate playoffs.
+        # EXCEPTION: If we forced RR for 3 or 4 participants and pools was False, 
+        # we stop at the RR (no elimination rounds).
+        if use_round_robin:
+            if pools:
+                advancing_per_group = 1 if is_elite_class else 2
+                upper_count = len(groups) * advancing_per_group
+                upper_elim = self_calculate_elim(upper_count, has_bronze=is_bronze_event)
+                
+                if is_bronze_event:
+                    lower_count = participants - upper_count
+                    if lower_count > 1:
+                        lower_elim = self_calculate_elim(lower_count)
+            else:
+                # This handles the "3 or 4 participants" case when pools=False
+                # They get their RR, and upper_elim stays empty.
+                upper_elim = []
+        else:
+            # Straight elimination for everyone else
+            upper_elim = self_calculate_elim(participants, has_bronze=is_bronze_event)
+
+        # --- 3. Merge Playoff Rounds ---
+        playoff_rounds = []
+        num_playoff_rounds = max(len(upper_elim), len(lower_elim))
+        for i in range(num_playoff_rounds):
+            m_upper = upper_elim[i] if i < len(upper_elim) else 0
+            m_lower = lower_elim[i] if i < len(lower_elim) else 0
+            playoff_rounds.append(m_upper + m_lower)
+
+        # --- 4. Package Results ---
+        event_structures[event] = {
+            "round_robin": groups,
+            "elimination": upper_elim,
+            "lower_playoff": lower_elim
+        }
+        round_schedules[event] = rr_rounds + playoff_rounds
+
+    return event_structures, round_schedules
+
+def self_calculate_elim(n, has_bronze=False):
+    """Calculates elimination matches, adding 1 to the final round for Bronze match."""
+    if n <= 1: return []
+    rounds = []
+    
+    # Calculate the number of rounds needed (power of 2)
+    x = math.ceil(math.log2(n))
+    
+    # First round (Handle play-ins/byes)
+    # If n is a perfect power of 2, matches = n/2. Otherwise, n - next lowest power of 2.
+    if 2**x == n:
+        first = n // 2
+    else:
+        first = int(n - 2**(x - 1))
+    
+    rounds.append(first)
+    
+    # Subsequent rounds (halving matches until we hit 1)
+    # The number of players remaining after the first round is 2^(x-1)
+    remaining_players = 2**(x - 1)
+    matches = remaining_players // 2
+    
+    while matches >= 1:
+        rounds.append(matches)
+        matches //= 2
+    
+    # Add Bronze Match to the final round if applicable
+    if has_bronze and n >= 4 and len(rounds) > 0:
+        rounds[-1] += 1
+        
+    return rounds
 
 def check_rule_violations(player_events):
     warnings = []
@@ -431,18 +559,18 @@ def half_hour_slots(start_datetime: str, end_datetime: str):
 
 def minizinc_data(print_lists = True):
 
-    file_path = "Entries Dubbelturnering 2026 1.1.xlsx"  # <-- Excel file
+    file_path = "Junnutavling entries 2.xlsx"  # <-- Excel file
     event_codes = {"W", "M", "X", "B", "G"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision, super_weak_collision = analyze_collisions(event_correlations)
     event_structures, round_schedules = calculate_tournament_structure(event_players)
 
     # Time slots that can hold matches (15 min)
-    day_zero = half_hour_slots("2025-10-10 18:00", "2025-10-10 21:00") * 2 - 1
-    day_one = half_hour_slots("2025-10-10 09:00", "2025-10-10 21:00") * 2 - 1
-    day_two_1 = half_hour_slots("2025-10-10 09:00", "2025-10-10 10:00") * 2 - 1
-    day_two_2 = half_hour_slots("2025-10-10 10:30", "2025-10-10 14:00") * 2 - 1
-    day_two_3 = half_hour_slots("2025-10-10 14:30", "2025-10-10 19:00") * 2 - 1
+    day_zero = half_hour_slots("2025-10-10 09:00", "2025-10-10 21:00") * 2 - 1 #half_hour_slots("2025-10-10 17:15", "2025-10-10 21:00") * 2 - 1
+    day_one = 0 #half_hour_slots("2025-10-10 09:00", "2025-10-10 21:00") * 2 - 1
+    day_two_1 = 0 #half_hour_slots("2025-10-10 09:00", "2025-10-10 10:00") * 2 - 1
+    day_two_2 = 0 #half_hour_slots("2025-10-10 10:30", "2025-10-10 14:00") * 2 - 1
+    day_two_3 = 0 #half_hour_slots("2025-10-10 14:30", "2025-10-10 19:00") * 2 - 1
 
     # The tree different time slots based on how many fields are available
     timeslots_12_fields = day_zero + day_one + day_two_1
@@ -549,10 +677,12 @@ def minizinc_data(print_lists = True):
         # Using 'in' is safer here in case the name is 'BS U13' or 'BS U13 '
         elif any(jr in event_name for jr in ["U9", "U11", "U13"]):
             nof_junior_classes += 1
+            print(event_name)
             
         # 4. Everything else
         else:
             nof_rest_classes += 1
+            print(event_name)
     
 
     # Initialize index trackers for when the special classes start and end
@@ -654,6 +784,7 @@ def minizinc_data(print_lists = True):
         print(nof_A_classes, end='\n')
         print("NUMBER OF JUNIOR (U9, U11, U13) EVENTS:")
         print(nof_junior_classes, end='\n')
+
         print("NUMBER OF REMAINING EVENTS:")
         print(nof_rest_classes, end='\n\n')
 
@@ -750,16 +881,16 @@ def minizinc_data(print_lists = True):
     return data
 
 def main():
-    file_path = "Entries Dubbelturnering 2026 1.1.xlsx"  # <-- your Excel file
+    file_path = "Junnutavling entries 2.xlsx"  # <-- your Excel file
     event_codes = {"W", "M", "X", "B", "G"}
     event_correlations, event_players, player_events = parse_competition_excel(file_path, event_codes)
     strong_collision, weak_collision, super_weak_collision = analyze_collisions(event_correlations)
     event_structures, round_schedules = calculate_tournament_structure(event_players)
     rule_violations = check_rule_violations(player_events)
     problematic_players = find_problematic_players(player_events, event_players, event_correlations)
-    #write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events")
-    #write_event_analysis_to_excel(file_path, event_correlations, round_schedules, event_structures, event_players, sheet_name="Event Analysis")
-    #log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations")
+    write_player_events_to_excel(file_path, player_events, problematic_players, sheet_name="Player Events")
+    write_event_analysis_to_excel(file_path, event_correlations, round_schedules, event_structures, event_players, sheet_name="Event Analysis")
+    log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Violations")
     time_slots = half_hour_slots("2025-10-10 09:00", "2025-10-10 13:30")
 
     day_zero = half_hour_slots("2025-10-10 18:00", "2025-10-10 21:00") * 2 - 1
