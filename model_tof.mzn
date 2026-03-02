@@ -555,15 +555,18 @@ var int: class_span =
 var int: round_span =
     sum(r in Rounds)(sum([time_of_match[m] - min_match_time_in_round[r] | m in matches_in_round[r]]));
 
+var int: cumulative_match_times =
+    sum (m in Matches)(time_of_match[m]);
+
 solve minimize 
         % Primary goal: Keep the whole day as short as possible
         makespan * pow(10,6) 
         
-        % Secondary goal: Tighten the rounds within each class
-        + class_span * pow(10, 3)
+        % Secondary goal: play matches early
+        + cumulative_match_times * pow(10, 2)
         
-        % Tertiary goal: tighten matches withing each round
-        + round_span;
+        % Tertiary goal: Tighten the rounds within each class
+        + class_span;
 
 
 

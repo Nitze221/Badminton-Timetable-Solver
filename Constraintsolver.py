@@ -219,7 +219,7 @@ async def main():
 
 
     # Choose solver (you can replace "gecode" with another installed solver)
-    solver = minizinc.Solver.lookup("chuffed")
+    solver = minizinc.Solver.lookup("cp-sat")
     #solver = minizinc.Solver.lookup("gecode")
 
     # Create instance and give input
@@ -331,7 +331,7 @@ async def main():
 
     # Solve
     last_solution = None
-    result = instance.solutions(processes=1, optimisation_level=3, intermediate_solutions=True, verbose=True, statistics=True)
+    result = instance.solutions(processes=4, optimisation_level=3, intermediate_solutions=True, verbose=True, statistics=True)
 
     try:
         
