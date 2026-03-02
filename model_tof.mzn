@@ -351,15 +351,11 @@ predicate collisionClass(int: c1, int: c2, int: gap) =
 constraint
     forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
        collisionClass(strong_collision[i], strong_collision[i+1], 4)
-       /\
-       noOverlap(strong_collision[i], strong_collision[i+1])
     );
 % weak collision
 constraint
     forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
         collisionClass(weak_collision[i], weak_collision[i+1], 3)
-        /\
-        noOverlap(weak_collision[i], weak_collision[i+1])
     );
 
 % super weak collision
@@ -550,13 +546,24 @@ constraint
  %   ((max(time_of_match) - min(time_of_match)) * 100) 
   %  + sum(c in 1..nof_classes)(max_match_time_in_class[c] - min_match_time_in_class[c]);
 
-solve :: int_search(time_of_match, smallest, indomain_min)
-    minimize 
+var int: makespan =
+    max(time_of_match) - min(time_of_match);
+
+var int: class_span =
+    sum(c in 1..nof_classes)(max_match_time_in_class[c] - min_match_time_in_class[c]);
+
+var int: round_span =
+    sum(r in Rounds)(sum([time_of_match[m] - min_match_time_in_round[r] | m in matches_in_round[r]]));
+
+solve minimize 
         % Primary goal: Keep the whole day as short as possible
-        ((max(time_of_match) - min(time_of_match)) * 100) 
+        makespan * pow(10,6) 
         
         % Secondary goal: Tighten the rounds within each class
-        + sum(c in 1..nof_classes)(max_match_time_in_class[c] - min_match_time_in_class[c]);
+        + class_span * pow(10, 3)
+        
+        % Tertiary goal: tighten matches withing each round
+        + round_span;
 
 
 
