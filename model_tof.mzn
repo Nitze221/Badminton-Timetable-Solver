@@ -3,6 +3,7 @@ include "global_cardinality.mzn";
 include "increasing.mzn";
 include "strictly_increasing.mzn";
 include "cumulative.mzn";
+include "disjunctive.mzn";
 
 int: nof_strong_collisions;
 int: nof_weak_collisions;
@@ -311,10 +312,10 @@ constraint
 
 constraint
     forall(r in 1..nof_rounds)(
-        if card(matches_in_round[r]) > 4 then
+        if card(matches_in_round[r]) > 6 then 
             (max_match_time_in_round[r] - min_match_time_in_round[r]) < 3
         else
-            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 2
+            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 1
         endif
     );
 
@@ -333,12 +334,12 @@ constraint
 
 predicate collision(int: r1, int: r2, int: gap) =
     ((max_match_time_in_round[r1] + gap <= min_match_time_in_round[r2])
-    xor
+    \/
     (max_match_time_in_round[r2] + gap <= min_match_time_in_round[r1]));
 
 predicate noOverlap(int: r1, int: r2) =
     ((max_match_time_in_round[r1] + 0 <= min_match_time_in_round[r2])
-    xor
+    \/
     (max_match_time_in_round[r2] + 0 <= min_match_time_in_round[r1]));
 
 predicate collisionClass(int: c1, int: c2, int: gap) =
@@ -380,19 +381,24 @@ constraint
 % switch constraint to domain narrowing
 % Tighten domains of finals in elit classes to be strictly after last_of_day1
 
+% The starting timeslot of the 3 days
 
+set of Slots: Day_anchors = {1, last_of_day0 + 1, last_of_day1 + 1};
+
+array[Rounds] of var Day_anchors: round_day_anchor;
 
 % Block any round from beeing split between two days
 
 constraint
-    forall(r in 1..nof_rounds) (
-        (max_match_time_in_round[r] <= last_of_day0
-         xor
-         min_match_time_in_round[r] > last_of_day0)
-    /\
-        (max_match_time_in_round[r] <= last_of_day1
-         xor
-         min_match_time_in_round[r] > last_of_day1)
+    forall(r in Rounds)(
+        % If the round is on Day 0, the anchor is Slot 1
+        (max_match_time_in_round[r] <= last_of_day0 /\ round_day_anchor[r] == 1)
+        \/
+        % If the round is on Day 1, the anchor is the start of Day 1
+        (min_match_time_in_round[r] > last_of_day0 /\ max_match_time_in_round[r] <= last_of_day1 /\ round_day_anchor[r] == last_of_day0 + 1)
+        \/
+        % If the round is on Day 2, the anchor is the start of Day 2
+        (min_match_time_in_round[r] > last_of_day1 /\ round_day_anchor[r] == last_of_day1 + 1)
     );
 
 constraint exists(m in 1..nof_matches)(
@@ -415,7 +421,7 @@ constraint
         card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c}) <= 3
     )(
         (max_match_time_in_class[c] <= last_of_day1)
-        xor
+        \/
         (min_match_time_in_class[c] > last_of_day1)
     );
 
@@ -511,27 +517,69 @@ constraint
  %   ((max(time_of_match) - min(time_of_match)) * 100) 
   %  + sum(c in 1..nof_classes)(max_match_time_in_class[c] - min_match_time_in_class[c]);
 
+/*
+var int: obj_daywise_wait = 
+    sum(c in Classes, i in 1..nof_rounds_in_class[c]-1)(
+        let {
+            int: r1 = rounds_in_class[c][i],
+            int: r2 = rounds_in_class[c][i+1]
+        } in
+        % If both rounds are on the same day, penalize the gap between them
+        bool2int(round_day_anchor[r1] == round_day_anchor[r2]) * (min_match_time_in_round[r2] - max_match_time_in_round[r1])
+    );
+*/
+var int: daywise_class_span = 
+    sum(c in Classes, d in Day_anchors, )(
+        let {
+            % 1. Get all matches in the class
+            set of int: ms = matches_in_class[c];
+            
+            % 2. Create a 'virtual' list of times for matches on this day.
+            % If a match is NOT on day 'd', we give it a value that won't 
+            % affect the min/max (0 for max, very large for min).
+            array[int] of var int: day_mins = [ 
+                if round_day_anchor[r] == d then min_match_time_in_round[r] else max(Slots) endif
+                | r in rounds_in_class[c] 
+            ];
+            array[int] of var int: day_maxes = [ 
+                if round_day_anchor[r] == d then max_match_time_in_round[r] else 0 endif
+                | r in rounds_in_class[c]
+            ];
+        } in
+        max(0, max(day_maxes) - min(day_mins))
+    );
+
 var int: makespan =
-    max(time_of_match) - min(time_of_match);
+    max(time_of_match);
 
 var int: class_span =
     sum(c in 1..nof_classes)(max_match_time_in_class[c] - min_match_time_in_class[c]);
 
+var int: class_gravity =
+    sum(c in Classes)(sum([time_of_match[m] - min_match_time_in_class[c] | m in matches_in_class[c]]));
+
 var int: round_span =
-    sum(r in Rounds)(sum([time_of_match[m] - min_match_time_in_round[r] | m in matches_in_round[r]]));
+    sum(r in Rounds)(max_match_time_in_round[r] - min_match_time_in_round[r]);
 
 var int: cumulative_match_times =
     sum (m in Matches)(time_of_match[m]);
 
+var int: morning_gravity =
+    sum(r in Rounds, m in matches_in_round[r])(
+        time_of_match[m] - round_day_anchor[r]
+    );
+
 solve minimize 
-        % Primary goal: Keep the whole day as short as possible
+        % Keep the whole tournament as short as possible
         makespan * pow(10,6) 
         
-        % Secondary goal: play matches early
-        + cumulative_match_times * pow(10, 2)
-        
-        % Tertiary goal: Tighten the rounds within each class
-        + class_span;
+        % Tighten the rounds within each class
+        + daywise_class_span * pow(10, 3)
+
+        % Play matches early in the day
+        + morning_gravity * pow(10, 2)
+
+        + round_span;
 
 
 
