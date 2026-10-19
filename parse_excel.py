@@ -640,15 +640,15 @@ def minizinc_data(print_lists = True):
     
     day_two_1 = 0#half_hour_slots("2025-10-10 09:00", "2025-10-10 10:00") * 2 - 1
     if competition_info.sunday_1:
-        day_one = half_hour_slots(competition_info.sunday_start_time_1, competition_info.sunday_end_time_1) * 2 - 1
+        day_two_1 = half_hour_slots(competition_info.sunday_start_time_1, competition_info.sunday_end_time_1) * 2 - 1
 
     day_two_2 = 0#half_hour_slots("2025-10-10 10:30", "2025-10-10 14:00") * 2 - 1
     if competition_info.sunday_2:
-        day_one = half_hour_slots(competition_info.sunday_start_time_2, competition_info.sunday_end_time_2) * 2 - 1
+        day_two_2 = half_hour_slots(competition_info.sunday_start_time_2, competition_info.sunday_end_time_2) * 2 - 1
 
     day_two_3 = 0#half_hour_slots("2025-10-10 14:30", "2025-10-10 19:00") * 2 - 1
     if competition_info.sunday_3:
-        day_one = half_hour_slots(competition_info.sunday_start_time_3, competition_info.sunday_end_time_3) * 2 - 1
+        day_two_3 = half_hour_slots(competition_info.sunday_start_time_3, competition_info.sunday_end_time_3) * 2 - 1
 
     if day_zero < 0 or day_one < 0 or day_two_1 < 0 or day_two_2 < 0 or day_two_3 < 0:
         print("❌ ERROR: the timeslots could not be counted! QUITTING!")
@@ -670,7 +670,7 @@ def minizinc_data(print_lists = True):
     matchslots_2 = timeslots_8_fields * fields_2
     matchslots_3 = timeslots_6_fields * fields_3
 
-    # the last slots of day 0 and first of day 1
+    # the last slots of day 0 and last of day 1
     last_of_day0 = day_zero
     last_of_day1 = (day_zero + day_one)
     
@@ -986,11 +986,11 @@ def main():
     
 
     # Print all players for all events
-    '''
+    
     print("\n=== Event -> Players ===")
     for event, players in event_players.items():
         print(f"{event}: {sorted(players)}")
-    '''
+    
     # Print the amount of entries for all events
     '''
     print("\n=== Event -> num Players ===")
@@ -998,33 +998,33 @@ def main():
         print(f"{event}: {participants}")
     '''
     # Print all events for all player
-    '''
+    
     print("\n=== Player -> Events ===")
     for player, events in player_events.items():
         print(f"{player}: {sorted(events)}")
-    '''
+    
     # Print all collitions for an event (with wight)
-    '''
+    
     print("\n=== Event Correlations ===")
     for event, correlations in event_correlations.items():
         print(f"\nEvent: {event}")
         for other_event, count in correlations:
             print(f"  {other_event}: {count}")
-    '''
+    
     # Print strong collisions for an event
     '''
     print("\n=== Events colliding with same last character ===")
     for event, others in strong_collision.items():
         print(f"{event}: {others}")
-    '''
+    
     # Print weak collitions for an event (with wight)
-    '''
+    
     print("\n=== Events colliding with different last character (with counts) ===")
     for event, others in weak_collision.items():
         print(f"{event}: {others}")
     '''
     # Print mathces per elimination round per event
-    '''
+    
     print("\n=== Event structures ===")
     for event, rounds in event_structures.items():
         print(f"{event}: {rounds}")
@@ -1032,15 +1032,15 @@ def main():
     print("\n=== Rounds and matches per round ===")
     for event, rounds in round_schedules.items():
         print(f"{event}: {rounds}")
-    '''
+    
     
     # Print warnings related to players entries
-    '''
+    
     for warning in rule_violations:
         print(warning)
-    '''
+    
     # Print summary
-    '''
+    
     print("\n=== Problematic Players ===")
     if not problematic_players:
         print("✅ No problematic players found.")
@@ -1049,7 +1049,7 @@ def main():
             print(f"⚠️ {player}:")
             for reason in reasons:
                 print(f"   - {reason}")
-    '''
+    
     print("\n----Done----\n")
 
 if __name__ == "__main__":

@@ -204,7 +204,7 @@ def print_in_terminal(schedule, start_time_str):
 async def main():
     print("\n\n----Running Constraintsolver.py----\n")
     # Load model
-    model = minizinc.Model("model_tof.mzn")
+    model = minizinc.Model("model_elite.mzn")
 
     data = minizinc_data(False)
     if not data:
@@ -212,6 +212,8 @@ async def main():
         print("\n----Done due to error----\n")
         return
 
+    print(data)
+    
     # Choose solver (you can replace "gecode" with another installed solver)
     solver = minizinc.Solver.lookup("cp-sat")
     #solver = minizinc.Solver.lookup("gecode")
@@ -321,6 +323,7 @@ async def main():
 
     if last_solution is None:
         print("❌ No solution found.")
+        print(res.status)
     else:
         #solution = result.solution[0]
         matches = last_solution.time_of_match
