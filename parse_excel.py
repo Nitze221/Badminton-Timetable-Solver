@@ -588,6 +588,7 @@ def half_hour_slots(start_datetime: str, end_datetime: str):
     
     return count
 '''
+'''
 def half_hour_slots(start_time: str, end_time: str):
     """
     Calculates how many 30-minute slots fit between two times (HH:MM format).
@@ -614,12 +615,74 @@ def half_hour_slots(start_time: str, end_time: str):
         current += slot_length
     
     return count
+'''
+
+# Calculates the amount of 15 minute times lots that are in a block
+def start_time_slots(start_time: str, end_time: str) -> int:
+    """
+    Calculates how many 15-minute match start times fit between start_time and end_time (inclusive).
+    Example: "09:00" to "12:00" -> 13 start slots.
+    Example: "12:15" to "16:00" -> 16 start slots.
+    """
+    time_format = "%H:%M"
+    start = datetime.strptime(start_time, time_format)
+    end = datetime.strptime(end_time, time_format)
+    
+    if end < start:
+        print(f"❌ ERROR: End time ({end_time}) is before start time ({start_time})! QUITTING!")
+        return -1
+    
+    total_minutes = int((end - start).total_seconds() // 60)
+    if total_minutes % 15 != 0:
+        print(f"❌ ERROR: Times ({start_time} to {end_time}) must be in 15-minute increments! QUITTING!")
+        return -1
+        
+    return (total_minutes // 15) + 1
+
+# Uses start_time_slots
+def parse_day_blocks(day_config, day_name: str):
+    """
+    Normalizes a day's config, checks that blocks don't overlap,
+    and returns (list_of_(number_of_slots, courts), num_of_total_day_slots).
+    """
+    if not day_config:
+        return [], 0
+
+    # Allow both ["09:00", "20:00", 16] and [["09:00", "20:00", 16]]
+    if isinstance(day_config[0], str):
+        day_config = [day_config]
+
+    blocks = []
+    day_total_slots = 0
+    time_format = "%H:%M"
+    prev_end_dt = None
+
+    for block in day_config:
+        start_str, end_str, courts = block[0], block[1], int(block[2])
+        start_dt = datetime.strptime(start_str, time_format)
+        end_dt = datetime.strptime(end_str, time_format)
+
+        # Ensure blocks on the same day don't overlap or share the same start/end timestamp
+        if prev_end_dt is not None and start_dt <= prev_end_dt:
+            prev_end_str = prev_end_dt.strftime(time_format)
+            print(f"❌ ERROR on {day_name}: Block starting at {start_str} overlaps with previous block ending at {prev_end_str}! (Next block should start at least 15 min later). QUITTING!")
+            return None, -1
+
+        slots = start_time_slots(start_str, end_str)
+        if slots <= 0:
+            return None, -1
+
+        blocks.append((slots, courts))
+        day_total_slots += slots
+        prev_end_dt = end_dt
+
+    return blocks, day_total_slots
 
 def minizinc_data(print_lists = True):
 
     file_path = competition_info.file_path
-    #file_path = "Junnu entries.xlsx"  # <-- Excel file 
-    #file_path = "Entries Dubbelturnering 2026 1.1.xlsx"  # <-- Excel file 
+    umpire_chairs = competition_info.umpire_chairs
+
     event_correlations, event_players, player_events = parse_competition_excel(file_path)
     if not event_correlations and not event_players and not player_events:
         print("❌ ERROR: No data was loaded from the excel (file name likely wrong). QUITTING!")
@@ -628,6 +691,7 @@ def minizinc_data(print_lists = True):
     event_structures, round_schedules = calculate_tournament_structure(event_players, competition_info.pool)
     event_colors = assign_event_colors(event_players.keys(), color_bank)
 
+    '''
     # Time slots that can hold matches (15 min)
     #day_zero = half_hour_slots("2025-10-10 09:00", "2025-10-10 21:00") * 2 - 1 
     day_zero = 0#half_hour_slots("2025-10-10 18:00", "2025-10-10 21:00") * 2 - 1
@@ -673,7 +737,37 @@ def minizinc_data(print_lists = True):
     # the last slots of day 0 and last of day 1
     last_of_day0 = day_zero
     last_of_day1 = (day_zero + day_one)
+
+    '''
+    fri_blocks, num_of_slots_day_zero = parse_day_blocks(competition_info.friday, "Friday")
+    sat_blocks, num_of_slots_day_one  = parse_day_blocks(competition_info.saturday, "Saturday")
+    sun_blocks, num_of_slots_day_two  = parse_day_blocks(competition_info.sunday, "Sunday")
+
+    if num_of_slots_day_zero < 0 or num_of_slots_day_one < 0 or num_of_slots_day_two < 0:
+        print("❌ ERROR: The timeslots could not be counted! QUITTING!")
+        return {}
     
+    all_blocks = fri_blocks + sat_blocks + sun_blocks
+    if not all_blocks:
+        print("❌ ERROR: No active competition days configured! QUITTING!")
+        return {}
+
+    # Dynamic block lists for MiniZinc
+    nof_blocks = len(all_blocks)
+    block_timeslots = [b[0] for b in all_blocks]
+    block_fields = [b[1] for b in all_blocks]
+    block_matchslots = [b[0] * b[1] for b in all_blocks]
+
+    # 1-indexed start slot for each block in MiniZinc
+    block_starts = []
+    current_slot = 1
+    for slots in block_timeslots:
+        block_starts.append(current_slot)
+        current_slot += slots
+
+    # Last slots of Day 0 (Friday) and Day 1 (Saturday)
+    last_of_day0 = num_of_slots_day_zero
+    last_of_day1 = num_of_slots_day_zero + num_of_slots_day_one
 
     # 2d list where index is class and element is list of matches (size = rounds)
     elimination_data_minizinc = [i[1] for i in round_schedules.items()]
@@ -851,11 +945,6 @@ def minizinc_data(print_lists = True):
     nof_A_rounds = sum(len(arr) for arr in elimination_data_minizinc[A_range["start"]-1 : A_range["end"]])
     
     if print_lists:
-        print("TIMESLOTS:")
-        print(timeslots_12_fields, end='\n')
-        print(timeslots_8_fields, end='\n')
-        print(timeslots_6_fields, end='\n\n')
-
         print("NUMBER OF V EVENTS:")
         print(nof_V_classes, end='\n')
         print("NUMBER OF A EVENTS:")
@@ -905,9 +994,15 @@ def minizinc_data(print_lists = True):
         print(super_weak_collision_minizinc, end="\n\n")
         #print("AMOUNT OF ELITE ROUNDS")
         #print(nof_elit_rounds, end="\n\n")
+        print("BLOCKS (1 block is timeslots and courts)")
+        print(all_blocks, end="\n\n")
+        print("BLOCK MATCHSLOTS (timeslots * courts)")
+        print(block_matchslots, end="\n\n")
 
     data = {
         "file_path": file_path,
+
+        "umpire_chairs": umpire_chairs,
 
         "strong_collision": strong_collision_minizinc,
         "weak_collision": weak_collision_minizinc,
@@ -916,17 +1011,11 @@ def minizinc_data(print_lists = True):
         "class_index": class_index,
         "round_index": round_index,
 
-        "timeslots_12_fields": timeslots_12_fields,
-        "timeslots_8_fields": timeslots_8_fields,
-        "timeslots_6_fields": timeslots_6_fields,
-
-        "fields_1": fields_1,
-        "fields_2": fields_2,
-        "fields_3": fields_3,
-
-        "matchslots_1": matchslots_1,
-        "matchslots_2": matchslots_2,
-        "matchslots_3": matchslots_3,
+        "nof_blocks": nof_blocks,
+        "block_starts": block_starts,
+        "block_timeslots": block_timeslots,
+        "block_fields": block_fields,
+        "block_matchslots": block_matchslots,
 
         "last_of_day1": last_of_day1,
         "last_of_day0": last_of_day0,

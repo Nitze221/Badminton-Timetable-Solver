@@ -44,10 +44,22 @@ def find_round(match_index, class_index, round_index):
 
 def build_schedule(class_index, round_index, time_of_match, class_names, data):
     # Find how many time slots exist
-    num_groups = data["timeslots_12_fields"] + data["timeslots_8_fields"] + data["timeslots_6_fields"]  # assuming time slots start at 0
+    #num_groups = data["timeslots_12_fields"] + data["timeslots_8_fields"] + data["timeslots_6_fields"]  # assuming time slots start at 0
+    num_groups = sum(data["block_timeslots"])
+    # Determine the maximum number of fields needed for the schedule grid
+    max_fields = max(data["block_fields"])
+    
+    # Build a list to know how many fields are in each individual time slot
+    fields_per_slot = [0] * num_groups
+    for b in range(data["nof_blocks"]):
+        start = data["block_starts"][b] - 1
+        for i in range(start, start + data["block_timeslots"][b]):
+            fields_per_slot[i] = data["block_fields"][b]
+
 
     # Initialize 2D list of None values (each slot has 10 possible matches)
-    schedule = [["        " for _ in range(data["fields_1"])] for _ in range(num_groups)]
+    #schedule = [["        " for _ in range(data["fields_1"])] for _ in range(num_groups)]
+    schedule = [["        " for _ in range(max_fields)] for _ in range(num_groups)]
 
     # Track how many matches are already in each time slot
     slot_counts = [0] * num_groups
@@ -60,7 +72,8 @@ def build_schedule(class_index, round_index, time_of_match, class_names, data):
         
         match_index_plus_one = match_index + 1     # since matches index starts with 1
         # Only place if there’s still space
-        if count < data["fields_1"]:
+        #if count < data["fields_1"]:
+        if count < fields_per_slot[time_slot-1]:
             class_id = find_class(match_index_plus_one, class_index)
             round_id = find_round(match_index_plus_one, class_index, round_index)
             match_name = f"{class_names[class_id - 1]} - {round_id}"
@@ -69,6 +82,10 @@ def build_schedule(class_index, round_index, time_of_match, class_names, data):
         else:
             # Optional: warn if slot overflows
             print(f"‼️ WARNING: time slot {time_slot-1} already full! match {match_name} not added to schedule")
+
+    # --- NEW LOGIC: Print used time slots ---
+    used_slots = sum(1 for count in slot_counts if count > 0)
+    print(f"📊 Total 15-minute time slots used: {used_slots} / {num_groups}")
 
     return schedule
 
@@ -221,6 +238,8 @@ async def main():
     # Create instance and give input
     instance = minizinc.Instance(solver, model)
 
+    instance["umpire_chairs"] = data["umpire_chairs"]
+
     instance["strong_collision"] = data["strong_collision"]
     instance["weak_collision"] = data["weak_collision"]
     instance["super_weak_collision"] = data["super_weak_collision"]
@@ -236,21 +255,11 @@ async def main():
     instance["nof_classes"] = len(data["class_index"])
     instance["nof_rounds"] = len(data["round_index"])
 
-
-    instance["timeslots_12_fields"] = data["timeslots_12_fields"]
-    instance["timeslots_8_fields"] = data["timeslots_8_fields"]
-    instance["timeslots_6_fields"] = data["timeslots_6_fields"]
-
-
-    instance["fields_1"] = data["fields_1"]
-    instance["fields_2"] = data["fields_2"]
-    instance["fields_3"] = data["fields_3"]
-
-
-    instance["matchslots_1"] = data["matchslots_1"]
-    instance["matchslots_2"] = data["matchslots_2"]
-    instance["matchslots_3"] = data["matchslots_3"]
-
+    instance["nof_blocks"] = data["nof_blocks"]
+    instance["block_starts"] = data["block_starts"]
+    instance["block_timeslots"] = data["block_timeslots"]
+    instance["block_fields"] = data["block_fields"]
+    instance["block_matchslots"] = data["block_matchslots"]
 
     instance["last_of_day1"] = data["last_of_day1"]
     instance["last_of_day0"] = data["last_of_day0"]
@@ -323,7 +332,7 @@ async def main():
 
     if last_solution is None:
         print("❌ No solution found.")
-        print(res.status)
+        #print(res.status)
     else:
         #solution = result.solution[0]
         matches = last_solution.time_of_match

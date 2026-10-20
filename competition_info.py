@@ -12,21 +12,26 @@ model = "model_elite.mzn"
 # pool or elimination
 pool = False
 
+
+# days, times of days, and courts
+friday = []
+saturday = ["09:00", "20:00", 16]
+sunday = [
+    ["9:00", "12:00", 12],
+    ["12:15", "16:30", 6]
+]
+
+# upmire chairs
+umpire_chairs = 4
+
+'''
+
 # days
 friday = False
 saturday = True
 sunday_1 = True
 sunday_2 = True
 sunday_3 = False
-
-#friday = False
-#saturday = True
-#sunday = True
-
-# times of days and courts
-#friday = []
-#saturday = ["09:00", "20:00", 16]
-#sunday = [["9:00", "12:00", 12], ["12:00", "16:30", 6]]
 
 # times of days
 friday_start_time = "18:00"
@@ -48,7 +53,7 @@ sunday_end_time_3 = "19:00"
 friday_saturday_sunday_1_courts = 12
 sunday_courts_2 = 8
 sunday_courts_3 = 6
-
+'''
 
 
 
@@ -70,18 +75,30 @@ def print_competition_info():
     print("📅 Competition Schedule:")
 
     # Helper to print day status
-    def print_day(name, active, start, end, courts):
-        status = "✅" if active else "❌"
-        if active:
-            print(f"  {status} {name:<10}: {start} to {end} ({courts} courts)")
+    def print_day(name, day_config):
+        if not day_config:
+            print(f"  ❌ {name:<8}: Not scheduled")
+            return
+        
+        # Normalize: if it's a single flat list like ["09:00", "20:00", 16], wrap it in a list
+        if isinstance(day_config[0], str):
+            blocks = [day_config]
         else:
-            print(f"  {status} {name:<10}: Not scheduled")
+            blocks = day_config
 
-    print_day("Friday", friday, friday_start_time, friday_end_time, friday_saturday_sunday_1_courts)
-    print_day("Saturday", saturday, saturday_start_time, saturday_end_time, friday_saturday_sunday_1_courts)
-    print_day("Sunday P1", sunday_1, sunday_start_time_1, sunday_end_time_1, friday_saturday_sunday_1_courts)
-    print_day("Sunday P2", sunday_2, sunday_start_time_2, sunday_end_time_2, sunday_courts_2)
-    print_day("Sunday P3", sunday_3, sunday_start_time_3, sunday_end_time_3, sunday_courts_3)
+        # Print formatting
+        if len(blocks) == 1:
+            start, end, courts = blocks[0]
+            print(f"  ✅ {name:<8}: {start:>5} to {end:>5} ({courts:>2} courts)")
+        else:
+            print(f"  ✅ {name:<8}:")
+            for i, block in enumerate(blocks):
+                start, end, courts = block[0], block[1], block[2]
+                print(f"      └─ Block {i+1}: {start:>5} to {end:>5} ({courts:>2} courts)")
+
+    print_day("Friday", friday)
+    print_day("Saturday", saturday)
+    print_day("Sunday P1", sunday)
 
     print("="*50)
     print("")

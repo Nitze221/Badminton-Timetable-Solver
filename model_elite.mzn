@@ -4,6 +4,8 @@ include "increasing.mzn";
 include "strictly_increasing.mzn";
 include "cumulative.mzn";
 
+int: umpire_chairs;
+
 int: nof_strong_collisions;
 int: nof_weak_collisions;
 int: nof_super_weak_collisions;
@@ -39,6 +41,7 @@ int: nof_A_matches;
 int: nof_junior_matches;
 int: nof_matches_rest;
 
+/*
 int: timeslots_12_fields;
 int: timeslots_8_fields;
 int: timeslots_6_fields;
@@ -50,6 +53,13 @@ int: fields_3;
 int: matchslots_1;
 int: matchslots_2;
 int: matchslots_3;
+*/
+
+int: nof_blocks;
+array[Blocks] of int: block_starts;
+array[Blocks] of int: block_timeslots;
+array[Blocks] of int: block_fields;
+array[Blocks] of int: block_matchslots;
 
 int: last_of_day1;
 int: last_of_day0;
@@ -68,7 +78,8 @@ set of int: matches_rest;
 
 
 set of int: Matches = 1..nof_matches; % same as set of int: all_matches; ?????                              ??????????????????????????
-set of int: Slots = 1..(timeslots_12_fields+timeslots_8_fields+timeslots_6_fields);
+%set of int: Slots = 1..(timeslots_12_fields+timeslots_8_fields+timeslots_6_fields);
+set of int: Slots = 1..total_timeslots;
 % set of int: Fields_1 = 1..fields;
 % set of int: Fields_2 =
 % set of int: Fields_3 = 
@@ -452,38 +463,62 @@ constraint
    %         | m in 1..nof_matches ]) <= fields_3
     %);
 
-% --- Global Constants --- we need this
+/*
+% --- Global Constants ---
 int: total_max_fields = max([fields_1, fields_2, fields_3]);
 
-% Define durations for every match (2 slots = 30 minutes)
-%array[Matches] of int: match_durations = [2 | m in Matches];
-%array[Matches] of int: court_usage = [1 | m in Matches];
+Define durations for every match (2 slots = 30 minutes)
+array[Matches] of int: match_durations = [2 | m in Matches];
+array[Matches] of int: court_usage = [1 | m in Matches];
 
 % --- Dummy Tasks to handle variable court availability ---
-% We create "Fixed matches" that occupy the courts you don't have.
+We create "Fixed matches" that occupy the courts you don't have.
 
-% 1. Block out fields when we drop from 12 to 8
-%int: dummy_8_start = timeslots_12_fields + 1;
-%int: dummy_8_dur = timeslots_8_fields;
-%int: dummy_8_req = total_max_fields - fields_2; % e.g., 12 - 8 = 4 courts blocked
+1. Block out fields when we drop from 12 to 8
+int: dummy_8_start = timeslots_12_fields + 1;
+int: dummy_8_dur = timeslots_8_fields;
+int: dummy_8_req = total_max_fields - fields_2; % e.g., 12 - 8 = 4 courts blocked
 
 % 2. Block out fields when we drop from 8 to 6
-%int: dummy_6_start = timeslots_12_fields + timeslots_8_fields + 1;
-%int: dummy_6_dur = timeslots_6_fields;
-%int: dummy_6_req = total_max_fields - fields_3; % e.g., 12 - 6 = 6 courts blocked
+int: dummy_6_start = timeslots_12_fields + timeslots_8_fields + 1;
+int: dummy_6_dur = timeslots_6_fields;
+int: dummy_6_req = total_max_fields - fields_3; % e.g., 12 - 6 = 6 courts blocked
 
-%constraint cumulative(
- %   [time_of_match[m] | m in Matches] ++ [dummy_8_start, dummy_6_start],
-  %  match_durations ++ [dummy_8_dur, dummy_6_dur],
-   % court_usage ++ [dummy_8_req, dummy_6_req],
-    %total_max_fields
-%);
+constraint cumulative(
+    [time_of_match[m] | m in Matches] ++ [dummy_8_start, dummy_6_start],
+    match_durations ++ [dummy_8_dur, dummy_6_dur],
+    court_usage ++ [dummy_8_req, dummy_6_req],
+    total_max_fields
+);
 
 array[Matches] of int: durations = [2 | _ in Matches];  % Each match occupies 2 timeslots
 array[Matches] of int: resources = [1 | _ in Matches];
 
 constraint cumulative(time_of_match, durations, resources, fields_1);
+*/
 
+set of int: Blocks = 1..nof_blocks;
+
+% --- Global Constants ---
+int: total_max_fields = max(block_fields);
+int: total_timeslots = sum(block_timeslots);
+
+% Define durations for every match (2 slots = 30 minutes)
+array[Matches] of int: match_durations = [2 | m in Matches];
+array[Matches] of int: court_usage = [1 | m in Matches];
+
+% --- Dynamic Dummy Tasks to handle variable court availability ---
+% We create a "Fixed task" for each block that occupies (total_max_fields - block_fields[b]) courts.
+array[Blocks] of int: dummy_starts = block_starts;
+array[Blocks] of int: dummy_durs   = block_timeslots;
+array[Blocks] of int: dummy_reqs   = [total_max_fields - block_fields[b] | b in Blocks];
+
+constraint cumulative(
+    [time_of_match[m] | m in Matches] ++ dummy_starts,
+    match_durations ++ dummy_durs,
+    court_usage ++ dummy_reqs,
+    total_max_fields
+);
 
 % 2 hours = 8 timeslots (the extra rest needed on top of the 12h night gap)
 %int: night_buffer = 8;
@@ -564,9 +599,26 @@ solve :: int_search(time_of_match, smallest, indomain_min)
 
 % Junnu - Ikäkausiluokissa 13, 11 ja 9 edellisen kilpailupäivän viimeisen ja seuraavan kilpailupäivän ensimmäisen pelin alkamisaikojen välin tulee olla vähintään 14 tuntia.
 
+
+
+
+
+
+
+
+
+
+
+
+% hela Elit och A finaler ska ha domare
+
+% Max 4 elit matcher på en gång
+
+% En elit match tar 1 h (inte 30 min)
+
+% Elit finaler (och seminfinaler om det går) ska spelas på söndag (sista tävlingsdagen)
+
 % Valioluokan kaksinpelissä neljännesvälierä-, puolivälierä-, välierä- ja loppuotteluidenn alkamisaikojen välillä tulee olla vähintään 3 tuntia
 
-
-
 % Jos pelimuodossa on Valio- tai A-luokassa enemmän kuin 16 pelaajaa tai peliparia, kaikkia otteluita ei ilman SSuL:n kilpailutoimintaryhmän myöntämää poikkeuslupaa saa pelata samana päivänä ellei kilpailukutsussa mainita kilpailun olevan yksipäiväisen.
-% Vi tappar banor
+
