@@ -816,10 +816,12 @@ def minizinc_data(print_lists = True):
 
     matches_minizic = []
     V_matches = []
+    single_V_matches = []
     A_matches = []
     junior_matches = []
     matches_rest = []
     is_elite_match = False
+    is_single_V_match = False
     is_A_match = False
     is_junior_match = False
     class_index = []
@@ -832,6 +834,7 @@ def minizinc_data(print_lists = True):
     # fix so it counts!!!
     # start_of_V_classes = 0 good to have later
     nof_V_classes = 0
+    nof_single_V_classes = 0
     nof_A_classes = 0
     nof_junior_classes = 0
     nof_rest_classes = 0
@@ -842,6 +845,8 @@ def minizinc_data(print_lists = True):
         # 1. Check for V classes (ending with V)
         if event_name.endswith("V"):
             nof_V_classes += 1
+            if "S" in event_name:
+                nof_single_V_classes += 1
             
         # 2. Check for A classes (ending with A)
         elif event_name.endswith("A"):
@@ -859,11 +864,13 @@ def minizinc_data(print_lists = True):
 
     # Initialize index trackers for when the special classes start and end
     V_range = {"start": 0, "end": 0}
+    single_V_range = {"start": 0, "end": 0}
     A_range = {"start": 0, "end": 0}
     junior_range = {"start": 0, "end": 0}
 
     # Initialize index trackers for when the special rounds start and end
     V_rounds_range = {"start": 0, "end": 0}
+    single_V_rounds_range = {"start": 0, "end": 0}
     A_rounds_range = {"start": 0, "end": 0}
     junior_rounds_range = {"start": 0, "end": 0}
 
@@ -874,6 +881,7 @@ def minizinc_data(print_lists = True):
 
     for outer in elimination_data_minizinc:
         is_elite_match = False
+        is_single_V_match = False
         is_A_match = False
         is_junior_match = False
 
@@ -885,6 +893,10 @@ def minizinc_data(print_lists = True):
             is_elite_match = True
             if V_range["start"] == 0: V_range["start"] = class_nr
             V_range["end"] = class_nr
+            if "S" in current_event_name:
+                is_single_V_match = True
+                if single_V_range["start"] == 0: single_V_range["start"] = class_nr
+                single_V_range["end"] = class_nr
 
         elif current_event_name.endswith("A"):
             is_A_match = True
@@ -901,6 +913,9 @@ def minizinc_data(print_lists = True):
             if is_elite_match:
                 if V_rounds_range["start"] == 0: V_rounds_range["start"] = round_counter
                 V_rounds_range["end"] = round_counter
+                if is_single_V_match:
+                    if single_V_rounds_range["start"] == 0: single_V_rounds_range["start"] = round_counter
+                    single_V_rounds_range["end"] = round_counter
             elif is_A_match:
                 if A_rounds_range["start"] == 0: A_rounds_range["start"] = round_counter
                 A_rounds_range["end"] = round_counter
@@ -914,6 +929,8 @@ def minizinc_data(print_lists = True):
             for _ in range(0, inner):
                 if is_elite_match:
                     V_matches.append(count)
+                    if is_single_V_match:
+                        single_V_matches.append(count)
                 elif is_A_match:
                     A_matches.append(count)
                 elif is_junior_match:
@@ -928,6 +945,7 @@ def minizinc_data(print_lists = True):
     # Helper to validate: (end - start + 1) should equal the count we found earlier
     validations = [
         ("V", V_range, nof_V_classes),
+        ("Single V", single_V_range, nof_single_V_classes),
         ("A", A_range, nof_A_classes),
         ("Junior", junior_range, nof_junior_classes)
     ]
@@ -942,11 +960,14 @@ def minizinc_data(print_lists = True):
     # number of rounds for the special classes
     nof_junior_rounds = sum(len(arr) for arr in elimination_data_minizinc[junior_range["start"]-1 : junior_range["end"]])
     nof_V_rounds = sum(len(arr) for arr in elimination_data_minizinc[V_range["start"]-1 : V_range["end"]])
+    nof_single_V_rounds = sum(len(arr) for arr in elimination_data_minizinc[single_V_range["start"]-1 : single_V_range["end"]])
     nof_A_rounds = sum(len(arr) for arr in elimination_data_minizinc[A_range["start"]-1 : A_range["end"]])
     
     if print_lists:
         print("NUMBER OF V EVENTS:")
         print(nof_V_classes, end='\n')
+        print("NUMBER OF SINGLE V EVENTS:")
+        print(nof_single_V_classes, end='\n')
         print("NUMBER OF A EVENTS:")
         print(nof_A_classes, end='\n')
         print("NUMBER OF JUNIOR (U9, U11, U13) EVENTS:")
@@ -957,6 +978,8 @@ def minizinc_data(print_lists = True):
 
         print("NUMBER OF V ROUNDS:")
         print(nof_V_rounds, end='\n')
+        print("NUMBER OF SINGLE V ROUNDS:")
+        print(nof_single_V_rounds, end='\n')
         print("NUMBER OF A ROUNDS:")
         print(nof_A_rounds, end='\n')
         print("NUMBER OF JUNIOR (U9, U11, U13) ROUNDS:")
@@ -1021,22 +1044,28 @@ def minizinc_data(print_lists = True):
         "last_of_day0": last_of_day0,
 
         "nof_V_classes": nof_V_classes,
+        "nof_single_V_classes": nof_single_V_classes,
         "nof_A_classes": nof_A_classes,
         "nof_junior_classes": nof_junior_classes,
 
         "V_start": V_range["start"],
         "V_end": V_range["end"],
+        "single_V_start": single_V_range["start"],
+        "single_V_end": single_V_range["end"],
         "A_start": A_range["start"],
         "A_end": A_range["end"],
         "junior_start": junior_range["start"],
         "junior_end": junior_range["end"],
 
         "nof_V_rounds": nof_V_rounds,
+        "nof_single_V_rounds": nof_single_V_rounds,
         "nof_A_rounds": nof_A_rounds,
         "nof_junior_rounds": nof_junior_rounds,
 
         "V_rounds_start": V_rounds_range["start"],
         "V_rounds_end": V_rounds_range["end"],
+        "single_V_rounds_start": single_V_rounds_range["start"],
+        "single_V_rounds_end": single_V_rounds_range["end"],
         "A_rounds_start": A_rounds_range["start"],
         "A_rounds_end": A_rounds_range["end"],
         "junior_rounds_start": junior_rounds_range["start"],
@@ -1044,6 +1073,7 @@ def minizinc_data(print_lists = True):
         
         "matches": matches_minizic,
         "V_matches": V_matches,
+        "single_V_matches": single_V_matches,
         "A_matches": A_matches,
         "junior_matches": junior_matches,
         "matches_rest": matches_rest,

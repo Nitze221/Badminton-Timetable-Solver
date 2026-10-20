@@ -266,11 +266,14 @@ async def main():
 
 
     instance["nof_V_classes"] = data["nof_V_classes"]
+    instance["nof_single_V_classes"] = data["nof_single_V_classes"]
     instance["nof_A_classes"] = data["nof_A_classes"]
     instance["nof_junior_classes"] = data["nof_junior_classes"]
 
     instance["V_start"] = data["V_start"]
     instance["V_end"] = data["V_end"]
+    instance["single_V_start"] = data["single_V_start"]
+    instance["single_V_end"] = data["single_V_end"]
     instance["A_start"] = data["A_start"]
     instance["A_end"] = data["A_end"]
     instance["junior_start"] = data["junior_start"]
@@ -278,11 +281,14 @@ async def main():
 
 
     instance["nof_V_rounds"] = data["nof_V_rounds"]
+    instance["nof_single_V_rounds"] = data["nof_single_V_rounds"]
     instance["nof_A_rounds"] = data["nof_A_rounds"]
     instance["nof_junior_rounds"] = data["nof_junior_rounds"]
 
     instance["V_rounds_start"] = data["V_rounds_start"]
     instance["V_rounds_end"] = data["V_rounds_end"]
+    instance["single_V_rounds_start"] = data["single_V_rounds_start"]
+    instance["single_V_rounds_end"] = data["single_V_rounds_end"]
     instance["A_rounds_start"] = data["A_rounds_start"]
     instance["A_rounds_end"] = data["A_rounds_end"]
     instance["junior_rounds_start"] = data["junior_rounds_start"]
@@ -291,12 +297,14 @@ async def main():
 
     instance["all_matches"] = data["matches"]
     instance["V_matches"] = data["V_matches"]
+    instance["single_V_matches"] = data["single_V_matches"]
     instance["A_matches"] = data["A_matches"]
     instance["junior_matches"] = data["junior_matches"]
     instance["matches_rest"] = data["matches_rest"]
 
     instance["nof_matches"] = len(data["matches"])
     instance["nof_V_matches"] = len(data["V_matches"])
+    instance["nof_single_V_matches"] = len(data["single_V_matches"])
     instance["nof_A_matches"] = len(data["A_matches"])
     instance["nof_junior_matches"] = len(data["junior_matches"])
     instance["nof_matches_rest"] = len(data["matches_rest"])

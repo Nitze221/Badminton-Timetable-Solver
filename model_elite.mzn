@@ -41,6 +41,17 @@ int: nof_A_matches;
 int: nof_junior_matches;
 int: nof_matches_rest;
 
+int: nof_single_V_classes;
+int: single_V_start;
+int: single_V_end;
+
+int: nof_single_V_rounds;
+int: single_V_rounds_start;
+int: single_V_rounds_end;
+
+int: nof_single_V_matches;
+set of int: single_V_matches;
+
 /*
 int: timeslots_12_fields;
 int: timeslots_8_fields;
@@ -162,22 +173,43 @@ array[Rounds] of set of Matches: matches_in_round =
       %| r in 1..nof_rounds
     %];
 
-% TRUE if the match is a semifinal or final
-predicate is_semi_or_final(int: match, int: class) =
-    if class < nof_classes then
-        match >= class_index[class + 1] - 3 /\ match < class_index[class + 1]
-    else
-        match >= nof_matches - 2
-    endif;
+% TRUE if the match is a round of 16, quarterfinal, semifinal or final (last 15 matches of the class)
+function bool: is_r16_quarter_semi_or_final(int: match, int: class) =
+    let {
+        int: c_start = class_index[class];
+        int: c_end   = if class < nof_classes then class_index[class + 1] - 1 else nof_matches endif;
+        int: r16_start = max(c_start, c_end - 14);
+    } in (
+        match >= r16_start /\ match <= c_end
+    );
 
-% TRUE if the match is a final
-predicate is_final(int: match, int: class) =
-    if class < nof_classes then
-        match == class_index[class + 1] - 1
-    else
-        match == nof_matches
-    endif;
+% TRUE if the match is a quarterfinal, semifinal or final (last 7 matches of the class)
+function bool: is_quarter_semi_or_final(int: match, int: class) =
+    let {
+        int: c_start = class_index[class];
+        int: c_end   = if class < nof_classes then class_index[class + 1] - 1 else nof_matches endif;
+        int: qf_start = max(c_start, c_end - 6);
+    } in (
+        match >= qf_start /\ match <= c_end
+    );
 
+% TRUE if the match is a semifinal or final (last 3 matches of the class)
+function bool: is_semi_or_final(int: match, int: class) =
+    let {
+        int: c_start = class_index[class];
+        int: c_end   = if class < nof_classes then class_index[class + 1] - 1 else nof_matches endif;
+        int: sf_start = max(c_start, c_end - 2);
+    } in (
+        match >= sf_start /\ match <= c_end
+    );
+
+% TRUE if the match is a final (last match of the class)
+function bool: is_final(int: match, int: class) =
+    let {
+        int: c_end = if class < nof_classes then class_index[class + 1] - 1 else nof_matches endif;
+    } in (
+        match == c_end
+    );
 %array[Matches] of var 1..timeslots: time_of_match =
 %    [ (matches[i] - 1) div fields + 1 | i in Matches ];
 % ???
@@ -275,13 +307,13 @@ constraint
 % V (x = 90)
 constraint 
     forall(c in V_start..V_end, r in V_rounds_start..V_rounds_end - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 8
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 6
     );
 
 % A (x = 90)
 constraint 
     forall(c in A_start..A_end, r in A_rounds_start..A_rounds_end - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 8
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 6
     );
 
 % rest (x = 90)
@@ -325,7 +357,7 @@ constraint
         if card(matches_in_round[r]) > 4 then
             (max_match_time_in_round[r] - min_match_time_in_round[r]) < 3
         else
-            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 2
+            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 1
         endif
     );
 
@@ -362,15 +394,11 @@ predicate collisionClass(int: c1, int: c2, int: gap) =
 constraint
     forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
        collisionClass(strong_collision[i], strong_collision[i+1], 4)
-       /\
-       noOverlap(strong_collision[i], strong_collision[i+1])
     );
 % weak collision
 constraint
     forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
         collisionClass(weak_collision[i], weak_collision[i+1], 3)
-        /\
-        noOverlap(weak_collision[i], weak_collision[i+1])
     );
 
 % super weak collision
@@ -399,16 +427,12 @@ constraint
 
 % Block any round from beeing split between two days
 
-%constraint
- %   forall(r in 1..nof_rounds) (
-  %      (max_match_time_in_round[r] <= last_of_day0
-   %      xor
-    %     min_match_time_in_round[r] > last_of_day0)
-    %/\
-     %   (max_match_time_in_round[r] <= last_of_day1
-      %   xor
-       %  min_match_time_in_round[r] > last_of_day1)
-    %);
+constraint
+    forall(r in 1..nof_rounds) (
+        max_match_time_in_round[r] <= last_of_day1
+        xor
+        min_match_time_in_round[r] > last_of_day1
+    );
 
 %constraint exists(m in 1..nof_matches)(
  %   time_of_match[m] == last_of_day0 + 1
@@ -548,7 +572,7 @@ constraint cumulative(
             %)
         %)
     %);
-
+/*
 % --- Lunch Break Configuration ---
 int: lunch_start_slot = 9;  % 11:00
 int: lunch_end_slot = 23;   % 14:30
@@ -578,7 +602,7 @@ constraint
             endif
         )
     );
-
+*/
 % solve minimize (max(time_of_match) - min(time_of_match)) 
 
 %solve minimize 
@@ -616,9 +640,50 @@ solve :: int_search(time_of_match, smallest, indomain_min)
 
 % En elit match tar 1 h (inte 30 min)
 
+constraint
+    let {
+        % Define umpire matches: all matches in V-classes plus finals in A-classes
+        set of int: umpire_matches = 
+            { m | c in V_start..V_end, m in matches_in_class[c] } union
+            { m | c in A_start..A_end, m in matches_in_class[c] where is_final(m, c) };
+    } in (
+        cumulative(
+            [time_of_match[um] | um in umpire_matches],
+            [2 | um in umpire_matches],      % 1 hour = 4 x 15-minute slots
+            [1 | um in umpire_matches],      % Each match uses 1 chair
+            umpire_chairs                    % Available umpire chairs
+        )
+    );
+
 % Elit finaler (och seminfinaler om det går) ska spelas på söndag (sista tävlingsdagen)
 
-% Valioluokan kaksinpelissä neljännesvälierä-, puolivälierä-, välierä- ja loppuotteluidenn alkamisaikojen välillä tulee olla vähintään 3 tuntia
+constraint
+    let {
+        set of int: v_finals = { m | c in V_start..V_end, m in matches_in_class[c] where is_semi_or_final(m, c) };
+    } in (
+        forall(m in v_finals) (
+            time_of_match[m] > last_of_day1
+        )
+    );
+
+
+% Valioluokan kaksinpelissä neljännesvälierä-, puolivälierä-, välierä- ja loppuotteluiden alkamisaikojen välillä tulee olla vähintään 3 tuntia (12 * 15 min = 180 min)
+constraint
+    forall(c in single_V_start..single_V_end, r in single_V_rounds_start..single_V_rounds_end - 1 
+           where class_of_match[round_index[r]] == c /\ class_of_match[round_index[r + 1]] == c) (
+        if is_r16_quarter_semi_or_final(round_index[r], c) then
+            (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 12
+        else
+            true
+        endif
+    );
 
 % Jos pelimuodossa on Valio- tai A-luokassa enemmän kuin 16 pelaajaa tai peliparia, kaikkia otteluita ei ilman SSuL:n kilpailutoimintaryhmän myöntämää poikkeuslupaa saa pelata samana päivänä ellei kilpailukutsussa mainita kilpailun olevan yksipäiväisen.
-
+constraint
+    forall(c in (V_start..V_end) union (A_start..A_end) where nof_rounds_in_class[c] > 4)(
+        % The class cannot both start and end on Saturday
+        not (max_match_time_in_class[c] <= last_of_day1)
+        /\
+        % The class cannot both start and end on Sunday
+        not (min_match_time_in_class[c] > last_of_day1)
+    );
