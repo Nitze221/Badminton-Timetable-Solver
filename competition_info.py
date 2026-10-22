@@ -1,10 +1,13 @@
 
 # THIS FILE HOLDS THE RELEVANT INFORMATION ABOUT THE COMPETITION
+from pathlib import Path
+current_dir = Path(__file__).parent
 
 # the excel (remember .xlsx)
 #file_path = "Junnu entries.xlsx"
 #file_path = "Entries Dubbelturnering 2026 1.1.xlsx"
-file_path = "Entries HBC Premier Elite 2024.xlsx"
+#file_path = "Entries HBC Premier Elite 2024.xlsx"
+file_path = current_dir / "Helsinki Open Elit 2026" / "Preliminära Entries - Helsinki Open Elit 2026.xlsx"
 
 # the model
 model = "model_elite.mzn"
@@ -15,47 +18,46 @@ pool = False
 
 # days, times of days, and courts
 friday = []
-saturday = ["09:00", "20:00", 16]
+saturday = ["09:00", "21:00", 16]
 sunday = [
-    ["9:00", "12:00", 12],
-    ["12:15", "16:30", 6]
+    ["9:00", "14:00", 12],
+    ["14:15", "17:30", 6]
 ]
 
 # upmire chairs
-umpire_chairs = 4
+umpire_chairs = 5
 
-'''
+# Strong collision time gap
+# Weak collision time gap
+# Super weak collision time gap
 
-# days
-friday = False
-saturday = True
-sunday_1 = True
-sunday_2 = True
-sunday_3 = False
+# V between rounds gap
+# A between rounds gap
+# Rest between rounds gap
+# Junior between rounds gap
 
-# times of days
-friday_start_time = "18:00"
-friday_end_time = "21:00"
+# The amount of matches in an umpire round needed to get tighter time constraints for the starttime of the matches
+a = 4 # this number should be <= umpire_chairs
+# Max umprire round duration (if there are > a mathces in the round)
+# Max umprire round duration (if there are <= a mathces in the round)
 
-saturday_start_time = "09:00"
-saturday_end_time = "21:00"
+# The amount of matches in a non-umpire round needed to get tighter time constraints for the starttime of the matches
+b = 4 # this number needs be <= max fields
+# Max non-umpite round duration (if there are > b mathces in the round)
+# Max non-umpite round duration (if there are <= b mathces in the round)
 
-sunday_start_time_1 = "09:00"
-sunday_end_time_1 = "12:00"
+# Umpire match duration
+# Non-upire match duration
 
-sunday_start_time_2 = "12:00"
-sunday_end_time_2 = "17:30"
-
-sunday_start_time_3 = "14:30"
-sunday_end_time_3 = "19:00"
-
-# courts
-friday_saturday_sunday_1_courts = 12
-sunday_courts_2 = 8
-sunday_courts_3 = 6
-'''
+# The amount of rounds in a class needed to get tighter time constraints for the class
+c = 3
+# In classes with > c rounds: all matches within (rounds * x) timeslots
+x = 15
+# In classes with <= c rounds: all matches within (rounds * y) timeslots
+y = 10
 
 
+# 
 
 
 # Pretty print

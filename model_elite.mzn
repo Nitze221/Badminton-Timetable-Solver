@@ -102,8 +102,20 @@ set of int: Rounds = 1..nof_rounds;
 array[Classes] of Matches: class_index;
 array[Rounds] of Matches: round_index;
 
-%set of int: umpire_matches;
-%array[1..nof_matches_no_umpire] of Matches: matches_no_umpire;
+set of int: umpire_matches = 
+    { m | c in V_start..V_end, m in matches_in_class[c] } union
+    { m | c in A_start..A_end, m in matches_in_class[c] where is_final(m, c) };
+
+set of int: matches_no_umpire =
+    Matches diff umpire_matches;
+
+% A round is an umpire round if at least one of its matches requires an umpire
+set of int: umpire_rounds = {
+    r | r in Rounds where card(matches_in_round[r] intersect umpire_matches) > 0
+};
+
+set of int: no_umpire_rounds = Rounds diff umpire_rounds;
+
 array[1..nof_strong_collisions] of Classes: strong_collision;
 array[1..nof_weak_collisions] of Classes: weak_collision;
 array[1..nof_super_weak_collisions] of Classes: super_weak_collision;
@@ -353,9 +365,18 @@ constraint
 % matches must be played within 1 or 2 rounds
 
 constraint
-    forall(r in 1..nof_rounds)(
+    forall(r in no_umpire_rounds)(
         if card(matches_in_round[r]) > 4 then
             (max_match_time_in_round[r] - min_match_time_in_round[r]) < 3
+        else
+            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 1
+        endif
+    );
+
+constraint
+    forall(r in umpire_rounds)(
+        if card(matches_in_round[r]) > 4 then % this number must be <= umpire_chairs
+            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 4
         else
             (max_match_time_in_round[r] - min_match_time_in_round[r]) < 1
         endif
@@ -439,7 +460,7 @@ constraint
 %);
 
 
-% Junnu - Kolmen tai neljän osanottajan poolin kaikkien otteluiden alkamisaikojen tulee olla viiden tunnin sisällä
+
 % In classes with <= 3 rounds: all matches within (rounds * 10) timeslots
 constraint
     forall(c in Classes where 
@@ -528,7 +549,11 @@ int: total_max_fields = max(block_fields);
 int: total_timeslots = sum(block_timeslots);
 
 % Define durations for every match (2 slots = 30 minutes)
-array[Matches] of int: match_durations = [2 | m in Matches];
+% Umpire matches take 3 slots (45 min), all other matches take 2 slots (30 min)
+array[Matches] of int: match_durations = [
+    if m in umpire_matches then 3 else 2 endif 
+    | m in Matches
+];
 array[Matches] of int: court_usage = [1 | m in Matches];
 
 % --- Dynamic Dummy Tasks to handle variable court availability ---
@@ -638,21 +663,13 @@ solve :: int_search(time_of_match, smallest, indomain_min)
 
 % Max 4 elit matcher på en gång
 
-% En elit match tar 1 h (inte 30 min)
 
 constraint
-    let {
-        % Define umpire matches: all matches in V-classes plus finals in A-classes
-        set of int: umpire_matches = 
-            { m | c in V_start..V_end, m in matches_in_class[c] } union
-            { m | c in A_start..A_end, m in matches_in_class[c] where is_final(m, c) };
-    } in (
-        cumulative(
-            [time_of_match[um] | um in umpire_matches],
-            [2 | um in umpire_matches],      % 1 hour = 4 x 15-minute slots
-            [1 | um in umpire_matches],      % Each match uses 1 chair
-            umpire_chairs                    % Available umpire chairs
-        )
+    cumulative(
+        [time_of_match[um] | um in umpire_matches],
+        [3 | um in umpire_matches],      % 3 x 15-minute slots
+        [1 | um in umpire_matches],      % Each match uses 1 chair
+        umpire_chairs                    % Available umpire chairs
     );
 
 % Elit finaler (och seminfinaler om det går) ska spelas på söndag (sista tävlingsdagen)
@@ -687,3 +704,8 @@ constraint
         % The class cannot both start and end on Sunday
         not (min_match_time_in_class[c] > last_of_day1)
     );
+
+
+
+
+    % Junnu - Kolmen tai neljän osanottajan poolin kaikkien otteluiden alkamisaikojen tulee olla viiden tunnin sisällä

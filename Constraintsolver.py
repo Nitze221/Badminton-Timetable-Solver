@@ -90,7 +90,7 @@ def build_schedule(class_index, round_index, time_of_match, class_names, data):
     return schedule
 
 
-def write_schedule_to_excel(file_path, schedule, event_colors, start_time_str, num_courts=12, sheet_name="timetable", start_row=2, start_col=2):
+def write_schedule_to_excel(file_path, schedule, event_colors, start_time_str, num_courts, sheet_name="timetable", start_row=2, start_col=2):
     try:
         book = load_workbook(file_path)
     except FileNotFoundError:
@@ -350,7 +350,7 @@ async def main():
         schedule = build_schedule(data["class_index"], data["round_index"], matches, list(data["event_colors"].keys()), data)
         print_in_terminal(schedule, "09:00")
 
-        write_schedule_to_excel(data["file_path"], schedule, data["event_colors"], "09:00", sheet_name="timetable", start_row=4, start_col=3)
+        write_schedule_to_excel(data["file_path"], schedule, data["event_colors"], "09:00", num_courts=max(data["block_fields"]), sheet_name="timetable", start_row=4, start_col=3)
         print("Printed to excel!")
 
     print("\n----Done----\n")
