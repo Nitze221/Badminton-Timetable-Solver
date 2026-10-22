@@ -28,36 +28,47 @@ sunday = [
 umpire_chairs = 5
 
 # Strong collision time gap
+4
 # Weak collision time gap
+3
 # Super weak collision time gap
+2
 
 # V between rounds gap
+6
 # A between rounds gap
+5
 # Rest between rounds gap
+5
 # Junior between rounds gap
 
 # The amount of matches in an umpire round needed to get tighter time constraints for the starttime of the matches
 a = 4 # this number should be <= umpire_chairs
 # Max umprire round duration (if there are > a mathces in the round)
+1
 # Max umprire round duration (if there are <= a mathces in the round)
+3
 
 # The amount of matches in a non-umpire round needed to get tighter time constraints for the starttime of the matches
-b = 4 # this number needs be <= max fields
+b = 8 # this number needs be <= max fields
 # Max non-umpite round duration (if there are > b mathces in the round)
+1
 # Max non-umpite round duration (if there are <= b mathces in the round)
+3
 
 # Umpire match duration
+3
 # Non-upire match duration
+2
 
 # The amount of rounds in a class needed to get tighter time constraints for the class
 c = 3
 # In classes with > c rounds: all matches within (rounds * x) timeslots
-x = 15
+x = 20
 # In classes with <= c rounds: all matches within (rounds * y) timeslots
 y = 10
 
 
-# 
 
 
 # Pretty print
