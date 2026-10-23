@@ -122,6 +122,8 @@ array[1..nof_super_weak_collisions] of Classes: super_weak_collision;
 
 array[Matches] of var Slots: time_of_match;
 
+array[Matches] of Slots: warm_values;
+
 % check if a match is in a class
 function bool: in_class(int: match, int: class) = 
     (match >= class_index[class] /\ (class == nof_classes \/ match < class_index[class + 1]));
@@ -343,6 +345,12 @@ constraint
         (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 0
     );
 
+% MAX time between rounds 4 * 6 = 24 = 6 hours
+constraint 
+    forall(c in Classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) < 24
+    );
+
 %constraint
 %    forall(c in (nof_elit_classes+1)..nof_classes)(
 %        disjunctive(
@@ -366,7 +374,7 @@ constraint
 
 constraint
     forall(r in no_umpire_rounds)(
-        if card(matches_in_round[r]) > 4 then
+        if card(matches_in_round[r]) > 6 then
             (max_match_time_in_round[r] - min_match_time_in_round[r]) < 3
         else
             (max_match_time_in_round[r] - min_match_time_in_round[r]) < 1
@@ -411,21 +419,74 @@ predicate collisionClass(int: c1, int: c2, int: gap) =
             collision(r1, r2, gap)
        );
 
+predicate collisionClassFrontier(int: c1, int: c2, int: gap) =
+    let {
+        array[int] of Rounds: r1 = [r | r in rounds_in_class[c1]],
+        array[int] of Rounds: r2 = [r | r in rounds_in_class[c2]],
+        int: n1 = length(r1),
+        int: n2 = length(r2),
+        
+        % Exactly n1 integer variables instead of (n1 * n2) booleans!
+        array[1..n1] of var 1..n2 + 1: first_after
+    } in
+    % 1. Monotonicity along A: an earlier round of A finishes earlier, 
+    % so its first_after index in B must be <= that of later rounds
+    forall(i in 1..n1 - 1)(
+        first_after[i] <= first_after[i + 1]
+    )
+    /\
+    % 2. Forward disjunction: All rounds of B from first_after[i] onward must start after A[i]
+    forall(i in 1..n1, j in 1..n2)(
+        (j >= first_after[i]) -> (max_match_time_in_round[r1[i]] + gap <= min_match_time_in_round[r2[j]])
+    )
+    /\
+    % 3. Backward disjunction: All rounds of B before first_after[i] must finish before A[i]
+    forall(i in 1..n1, j in 1..n2)(
+        (j < first_after[i]) -> (max_match_time_in_round[r2[j]] + gap <= min_match_time_in_round[r1[i]])
+    );
+
+predicate collisionClassFrontierPerDay(int: c1, int: c2, int: gap) =
+    let {
+        array[int] of Rounds: r1 = [r | r in rounds_in_class[c1]],
+        array[int] of Rounds: r2 = [r | r in rounds_in_class[c2]],
+        int: n1 = length(r1),
+        int: n2 = length(r2),
+        
+        % Exactly n1 integer variables instead of (n1 * n2) booleans!
+        array[1..n1] of var 1..n2 + 1: first_after
+    } in
+    % 1. Monotonicity along A
+    forall(i in 1..n1 - 1)(
+        first_after[i] <= first_after[i + 1]
+    )
+    /\
+    % 2. Forward disjunction: Enforce gap only if on the same day
+    forall(i in 1..n1, j in 1..n2)(
+        (j >= first_after[i] /\ day_of_round[r1[i]] == day_of_round[r2[j]]) 
+        -> (max_match_time_in_round[r1[i]] + gap <= min_match_time_in_round[r2[j]])
+    )
+    /\
+    % 3. Backward disjunction: Enforce gap only if on the same day
+    forall(i in 1..n1, j in 1..n2)(
+        (j < first_after[i] /\ day_of_round[r1[i]] == day_of_round[r2[j]]) 
+        -> (max_match_time_in_round[r2[j]] + gap <= min_match_time_in_round[r1[i]])
+    );
+
 % strong collisions
 constraint
     forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
-       collisionClass(strong_collision[i], strong_collision[i+1], 4)
+       collisionClassFrontierPerDay(strong_collision[i], strong_collision[i+1], 4)
     );
 % weak collision
 constraint
     forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
-        collisionClass(weak_collision[i], weak_collision[i+1], 3)
+        collisionClassFrontierPerDay(weak_collision[i], weak_collision[i+1], 3)
     );
 
 % super weak collision
 constraint
     forall(i in 1..nof_super_weak_collisions where i mod 2 == 1) (
-        collisionClass(super_weak_collision[i], super_weak_collision[i+1], 2)
+        collisionClassFrontierPerDay(super_weak_collision[i], super_weak_collision[i+1], 2)
     );
 
 
@@ -444,16 +505,20 @@ constraint
 % switch constraint to domain narrowing
 % Tighten domains of finals in elit classes to be strictly after last_of_day1
 
-
-
 % Block any round from beeing split between two days
+% 1 = Day 0 / Friday, 2 = Day 1 / Saturday, 3 = Day 2 / Sunday
+set of int: DayIndices = 1..2;
+array[Rounds] of var DayIndices: day_of_round;
 
-constraint
-    forall(r in 1..nof_rounds) (
-        max_match_time_in_round[r] <= last_of_day1
-        xor
-        min_match_time_in_round[r] > last_of_day1
-    );
+constraint forall(r in Rounds)(
+    % Day 1:
+    (day_of_round[r] == 1 <-> max_match_time_in_round[r] <= last_of_day1)
+    /\
+    % Day 2:
+    (day_of_round[r] == 2 <-> min_match_time_in_round[r] > last_of_day1)
+);
+
+
 
 %constraint exists(m in 1..nof_matches)(
  %   time_of_match[m] == last_of_day0 + 1
@@ -634,16 +699,30 @@ constraint
  %   ((max(time_of_match) - min(time_of_match)) * 100) 
   %  + sum(c in 1..nof_classes)(max_match_time_in_class[c] - min_match_time_in_class[c]);
 
-solve :: int_search(time_of_match, smallest, indomain_min)
+var int: makespan =
+    max(time_of_match);
+
+var int: morning_gravity =
+    sum(r in Rounds, m in matches_in_round[r])(
+        time_of_match[m] - if day_of_round[r] == 2 then last_of_day1 + 1 else 0 endif
+    );
+
+var int: class_span =
+    sum(c in 1..nof_classes)(max_match_time_in_class[c] - min_match_time_in_class[c]);
+
+solve 
+    minimize
+        makespan;
+/*
+solve :: warm_start(time_of_match, warm_values)
     minimize 
         % Primary goal: Keep the whole day as short as possible
-        ((max(time_of_match) - min(time_of_match)) * 100) 
-        
-        % Secondary goal: Tighten the rounds within each class
-        + sum(c in 1..nof_classes)(max_match_time_in_class[c] - min_match_time_in_class[c]);
+        class_span * pow(10,6)
+        +
+        morning_gravity;
 
-
-
+constraint makespan == 83;
+*/
 
 
 % Junnu - Ikäkausiluokissa 13, 11 ja 9 edellisen kilpailupäivän viimeisen ja seuraavan kilpailupäivän ensimmäisen pelin alkamisaikojen välin tulee olla vähintään 14 tuntia.
@@ -709,3 +788,19 @@ constraint
 
 
     % Junnu - Kolmen tai neljän osanottajan poolin kaikkien otteluiden alkamisaikojen tulee olla viiden tunnin sisällä
+
+
+
+% Annan optimering forutom makespan:
+
+/*
+1. För varje nivå (C, B, A, V, etc.)
+    - första rundan av single spelas före första rundan av dubbel och mixed
+    - sista rundan av singel spelas före sista rundan av dubbel och mixed (finaler)
+    - Minimera overlap per dag
+
+DET IDEALA (enlight Jori från kouvola):
+1. För varje dag
+    För varje nivå
+    - all singel före all dubbel och mixed
+*/

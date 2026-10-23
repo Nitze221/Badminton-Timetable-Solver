@@ -7,7 +7,7 @@ current_dir = Path(__file__).parent
 #file_path = "Junnu entries.xlsx"
 #file_path = "Entries Dubbelturnering 2026 1.1.xlsx"
 #file_path = "Entries HBC Premier Elite 2024.xlsx"
-file_path = current_dir / "Helsinki Open Elit 2026" / "Preliminära Entries - Helsinki Open Elit 2026.xlsx"
+file_path = current_dir / "Helsinki Open Elit 2026" / "Official Entries Helsinki Open Elit 2026 copy.xlsx"
 
 # the model
 model = "model_elite.mzn"
@@ -21,7 +21,7 @@ friday = []
 saturday = ["09:00", "21:00", 16]
 sunday = [
     ["9:00", "14:00", 12],
-    ["14:15", "17:30", 6]
+    ["14:15", "19:30", 6]
 ]
 
 # upmire chairs
