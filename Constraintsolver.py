@@ -1,6 +1,7 @@
 import minizinc
 import asyncio
 from parse_excel import minizinc_data
+from parse_excel import get_blocks_for_schedule_printing
 
 
 from openpyxl import load_workbook, Workbook
@@ -83,19 +84,18 @@ def build_schedule(class_index, round_index, time_of_match, class_names, data):
             # Optional: warn if slot overflows
             print(f"‼️ WARNING: time slot {time_slot-1} already full! match {match_name} not added to schedule")
 
-    # --- NEW LOGIC: Print used time slots ---
-    used_slots = sum(1 for count in slot_counts if count > 0)
-    print(f"📊 Total 15-minute time slots used: {used_slots} / {num_groups}")
-
     return schedule
 
 
-def write_schedule_to_excel(file_path, schedule, event_colors, start_time_str, num_courts, sheet_name="timetable", start_row=2, start_col=2):
+def write_schedule_to_excel(file_path, schedule, event_colors, days_blocks, sheet_name, start_row, start_col):
     try:
         book = load_workbook(file_path)
     except FileNotFoundError:
         print(f"❌ Error: The file '{file_path}' was not found. Skipping writing the schedule to Excel.")
         return
+
+    timestamp = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+    sheet_name = f"{sheet_name} {timestamp}"
 
     if sheet_name in book.sheetnames:
         del book[sheet_name]
@@ -103,37 +103,70 @@ def write_schedule_to_excel(file_path, schedule, event_colors, start_time_str, n
     sheet = book.create_sheet(sheet_name)
 
     fmt = "%H:%M"
+    '''
     current_time = datetime.strptime(start_time_str, fmt)
     end_limit = datetime.strptime("21:00", fmt)
-    
+    '''
+
     current_section_start_row = start_row
     relative_col_offset = 0
     
     match_found_count = 0
     match_fail_count = 0
 
+    # Initialize from the first block
+    day_idx = 0
+    block_idx = 0
+    slots_processed_in_block = 0
+
+    current_time = datetime.strptime(days_blocks[day_idx][block_idx][2], fmt)
+    num_courts = days_blocks[day_idx][block_idx][1]
+    max_courts_current_day = max(b[1] for b in days_blocks[day_idx])
+
     # We need to know the total columns in a section to define the COUNTA range
     # Let's calculate how many slots fit between start_time and 21:00
     # Or more simply, we can determine the end column of the current section block
     
+    #   Print court numbers for the very first day
+    for i in range(max_courts_current_day):
+        sheet.cell(row=current_section_start_row + i, column=start_col - 1).value = i + 1
+
     for slot_idx, time_slot in enumerate(schedule):
-        if current_time > end_limit:
-            # 12 rows (courts) + 1 row (formula) + 5 rows gap (3 original + 2 new)
-            current_section_start_row += (num_courts + 6)
-            current_time = datetime.strptime("09:00", fmt)
-            relative_col_offset = 0
+        # Check if we have filled all the 15-minute timeslots for the current block
+        if slots_processed_in_block >= days_blocks[day_idx][block_idx][0]:
+            block_idx += 1
+            slots_processed_in_block = 0
+            
+            # Check if we have finished all blocks for the current day
+            if block_idx >= len(days_blocks[day_idx]):
+                # Shift rows down for the new day based on the max courts used
+                current_section_start_row += (max_courts_current_day + 6)
+                
+                day_idx += 1
+                if day_idx >= len(days_blocks):
+                    break # Safety catch if the schedule is longer than defined days
+                
+                block_idx = 0
+                relative_col_offset = 0
+                
+                # Setup the new day
+                max_courts_current_day = max(b[1] for b in days_blocks[day_idx])
+                
+                # Print court numbers for the new day
+                for i in range(max_courts_current_day):
+                    sheet.cell(row=current_section_start_row + i, column=start_col - 1).value = i + 1
+                    
+            # Update time and courts for the next block (whether same day or new day)
+            current_time = datetime.strptime(days_blocks[day_idx][block_idx][2], fmt)
+            num_courts = days_blocks[day_idx][block_idx][1]
             
         actual_col = start_col + relative_col_offset
         col_letter = get_column_letter(actual_col)
         
         # 1. Write Time Header
         sheet.cell(row=current_section_start_row - 1, column=actual_col).value = current_time.strftime(fmt)
-        
-        # 2. Write Row Numbers (Courts)
-        for i in range(num_courts):
-            sheet.cell(row=current_section_start_row + i, column=start_col - 1).value = i + 1
 
-        # 3. Write Matches
+        # 2. Write Matches
         for row_idx_offset, match in enumerate(time_slot):
             if row_idx_offset >= num_courts:
                 break
@@ -151,30 +184,23 @@ def write_schedule_to_excel(file_path, schedule, event_colors, start_time_str, n
                 hex_bg, text_choice = event_colors[lookup_key]
                 clean_hex = hex_bg.replace("#", "")
                 cell.fill = PatternFill(start_color=clean_hex, end_color=clean_hex, fill_type="solid")
-                font_hex = "000000" if text_choice == "black" else "FFFFFF"
-                cell.font = Font(color=font_hex)
-                match_found_count += 1
-            else:
-                match_fail_count += 1
+                cell.font = Font(color="000000" if text_choice == "black" else "FFFFFF")
 
-        # 4. Add COUNTA Formula
-        # Formula range: From current row to (current row + num_courts - 1)
-        # And from current column to the end of the schedule (or end of section)
+        # 3. Add COUNTA Formula
         first_row = current_section_start_row
         last_row = current_section_start_row + num_courts - 1
-        
         last_col_letter = get_column_letter(actual_col + 1)
         
         formula_row = last_row + 1
         formula_cell = sheet.cell(row=formula_row, column=actual_col)
-        # Example: =COUNTA(C4:D15)
         formula_cell.value = f"=COUNTA({col_letter}{first_row}:{last_col_letter}{last_row})"
 
         current_time += timedelta(minutes=15)
         relative_col_offset += 1
+        slots_processed_in_block += 1
 
     book.save(file_path)
-    print(f"➡️  Schedule written with {num_courts} courts and extra spacing.")
+    print(f"➡️  Schedule written dynamically across {len(days_blocks)} days.")
 
 
 
@@ -401,7 +427,8 @@ async def main():
         schedule = build_schedule(data["class_index"], data["round_index"], matches, list(data["event_colors"].keys()), data)
         print_in_terminal(schedule, "09:00")
 
-        write_schedule_to_excel(data["file_path"], schedule, data["event_colors"], "09:00", num_courts=max(data["block_fields"]), sheet_name="timetable", start_row=4, start_col=3)
+        days_blocks = get_blocks_for_schedule_printing()
+        write_schedule_to_excel(file_path=data["file_path"], schedule=schedule, event_colors=data["event_colors"],days_blocks=days_blocks, sheet_name="timetable", start_row=4, start_col=3)
         print("Printed to excel!")
 
     print("\n----Done----\n")
@@ -431,8 +458,8 @@ data = minizinc_data(False)
 # matches = [37, 38, 59, 59, 69, 69, 81, 81, 97, 98, 34, 34, 34, 34, 34, 34, 40, 40, 40, 40, 40, 40, 55, 55, 55, 55, 56, 56, 66, 66, 68, 68, 68, 68, 83, 84, 84, 84, 84, 85, 93, 93, 94, 101, 101, 31, 31, 37, 37, 43, 43, 82, 82, 82, 98, 98, 72, 72, 78, 78, 89, 89, 2, 3, 3, 10, 10, 10, 18, 18, 18, 25, 25, 25, 51, 51, 51, 62, 62, 7, 7, 7, 7, 7, 15, 15, 15, 15, 15, 21, 21, 21, 21, 21, 28, 28, 28, 29, 36, 36, 70, 34, 35, 43, 43, 62, 62, 69, 69, 91, 43, 43, 52, 53, 59, 59, 7, 7, 7, 7, 8, 37, 37, 38, 38, 39, 64, 64, 64, 64, 64, 70, 70, 76, 76, 82, 1, 1, 1, 12, 12, 12, 18, 18, 18, 27, 27, 69, 39, 48, 55, 12, 12, 12, 12, 18, 18, 18, 18, 24, 24, 24, 24, 33, 33, 86, 80, 80, 86, 86, 99, 99, 11, 11, 19, 20, 32, 32, 40, 40, 54, 54, 8, 8, 23, 23, 31, 31, 42, 42, 82, 82, 12, 12, 18, 18, 27, 27, 70, 70, 86, 86, 13, 13, 13, 14, 41, 41, 42, 42, 64, 64, 64, 64, 76, 76, 87, 26, 26, 26, 32, 32, 32, 38, 38, 38, 54, 54, 84, 1, 12, 18, 5, 11, 17, 24, 24, 32, 32, 38, 38, 22, 23, 49, 50, 58, 59, 74, 74, 96, 69, 69, 78, 78, 88, 88, 36, 36, 57, 57, 67, 67, 92, 92, 101, 101, 51, 51, 61, 61, 69, 69, 97, 31, 31, 42, 42, 73, 73, 84, 27, 27, 27, 27, 27, 27, 45, 45, 45, 45, 45, 45, 60, 60, 60, 60, 60, 60, 70, 80, 80, 95, 4, 5, 6, 6, 6, 24, 24, 24, 24, 24, 33, 33, 33, 33, 33, 48, 48, 58, 39, 39, 39, 39, 54, 54, 54, 54, 64, 64, 64, 64, 76, 76, 89, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 57, 57, 57, 57, 57, 57, 57, 57, 57, 57, 67, 67, 67, 67, 67, 67, 67, 67, 73, 73, 73, 73, 92, 92, 98, 53, 53, 62, 63, 77, 77, 90, 90, 96, 9, 9, 9, 9, 9, 9, 9, 9, 15, 15, 15, 15, 15, 15, 15, 15, 21, 21, 21, 21, 21, 21, 21, 21, 30, 30, 30, 30, 30, 30, 30, 30, 36, 36, 36, 36, 42, 42, 83, 1, 1, 1, 1, 1, 1, 1, 1, 45, 45, 45, 45, 45, 45, 45, 45, 51, 51, 51, 51, 51, 51, 51, 51, 61, 61, 61, 61, 61, 61, 79, 79, 79, 79, 95, 95, 101, 53, 53, 53, 59, 59, 59, 65, 66, 66, 75, 75, 94, 95, 101, 7, 7, 9, 9, 9, 29, 29, 29, 29, 29, 35, 35, 35, 35, 35, 41, 41, 41, 41, 70, 70, 89]
 
 #time_of_match=[11, 21, 21, 21, 21, 27, 27, 33, 33, 37, 43, 49, 37, 43, 49, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 21, 21, 21, 21, 21, 21, 21, 21, 33, 33, 33, 33, 41, 41, 49, 49, 21, 21, 34, 34, 34, 34, 40, 40, 46, 46, 9, 17, 17, 25, 25, 13, 29, 29, 29, 29, 37, 37, 45, 45, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 31, 31, 31, 31, 31, 31, 31, 31, 37, 37, 37, 37, 43, 43, 49, 15, 15, 15, 21, 21, 21, 21, 27, 27, 33, 7, 7, 13, 13, 13, 13, 19, 19, 27, 37, 37, 43, 43, 49, 5, 5, 5, 5, 5, 5, 11, 11, 11, 11, 11, 11, 11, 11, 17, 17, 17, 17, 25, 25, 31, 19, 25, 31, 35, 41, 47, 37, 43, 43, 49]
-time_of_match=[19, 19, 29, 29, 36, 36, 43, 43, 93, 93, 5, 5, 5, 5, 5, 5, 33, 33, 33, 33, 33, 33, 45, 45, 45, 45, 45, 45, 55, 55, 55, 55, 55, 55, 65, 65, 65, 65, 65, 65, 71, 71, 71, 95, 95, 1, 1, 34, 34, 45, 45, 66, 66, 66, 72, 72, 13, 13, 21, 21, 27, 27, 39, 39, 39, 50, 50, 50, 60, 60, 60, 77, 77, 77, 83, 83, 83, 89, 89, 11, 11, 11, 11, 11, 37, 37, 37, 37, 37, 51, 51, 51, 51, 51, 61, 61, 61, 61, 91, 91, 97, 9, 9, 15, 15, 21, 21, 27, 27, 77, 67, 67, 73, 73, 79, 79, 7, 7, 7, 7, 7, 19, 19, 19, 19, 19, 25, 25, 25, 25, 25, 33, 33, 73, 73, 79, 43, 43, 43, 54, 54, 54, 61, 61, 61, 81, 81, 94, 23, 29, 35, 43, 43, 43, 43, 53, 53, 53, 53, 67, 67, 67, 67, 88, 88, 94, 3, 3, 16, 16, 22, 22, 24, 24, 30, 30, 41, 41, 90, 90, 96, 96, 33, 33, 44, 44, 52, 52, 59, 59, 97, 97, 7, 7, 14, 14, 20, 20, 69, 69, 79, 79, 23, 23, 23, 23, 41, 41, 41, 41, 58, 58, 58, 58, 67, 67, 84, 29, 29, 29, 35, 35, 35, 77, 77, 77, 86, 86, 92, 43, 52, 60, 32, 38, 49, 63, 63, 69, 69, 79, 79, 3, 3, 47, 47, 55, 55, 62, 62, 71, 81, 81, 87, 87, 93, 93, 11, 11, 40, 40, 65, 65, 73, 73, 81, 81, 18, 18, 26, 26, 69, 69, 77, 47, 47, 59, 59, 87, 87, 95, 5, 5, 5, 5, 5, 5, 13, 13, 13, 13, 13, 13, 21, 21, 21, 21, 21, 21, 35, 46, 46, 66, 11, 11, 11, 11, 11, 23, 23, 23, 23, 23, 35, 35, 35, 35, 35, 51, 51, 63, 29, 29, 29, 29, 41, 41, 41, 41, 56, 56, 56, 56, 83, 83, 92, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 49, 49, 49, 49, 49, 49, 49, 49, 63, 63, 63, 63, 70, 70, 80, 7, 7, 13, 13, 45, 45, 51, 51, 63, 27, 27, 27, 27, 27, 27, 28, 28, 38, 39, 39, 39, 39, 39, 39, 39, 57, 57, 57, 57, 57, 57, 57, 57, 75, 75, 75, 75, 75, 75, 75, 75, 85, 85, 85, 85, 91, 91, 97, 3, 3, 3, 3, 3, 3, 3, 3, 15, 15, 15, 15, 15, 15, 15, 15, 31, 31, 31, 31, 31, 31, 31, 32, 47, 47, 47, 47, 47, 47, 64, 64, 64, 64, 71, 71, 81, 7, 7, 7, 19, 19, 19, 31, 31, 31, 42, 42, 48, 48, 82, 25, 25, 25, 25, 25, 37, 37, 37, 37, 37, 53, 53, 53, 53, 53, 59, 59, 59, 59, 89, 89, 95]
-
+#time_of_match=[19, 19, 29, 29, 36, 36, 43, 43, 93, 93, 5, 5, 5, 5, 5, 5, 33, 33, 33, 33, 33, 33, 45, 45, 45, 45, 45, 45, 55, 55, 55, 55, 55, 55, 65, 65, 65, 65, 65, 65, 71, 71, 71, 95, 95, 1, 1, 34, 34, 45, 45, 66, 66, 66, 72, 72, 13, 13, 21, 21, 27, 27, 39, 39, 39, 50, 50, 50, 60, 60, 60, 77, 77, 77, 83, 83, 83, 89, 89, 11, 11, 11, 11, 11, 37, 37, 37, 37, 37, 51, 51, 51, 51, 51, 61, 61, 61, 61, 91, 91, 97, 9, 9, 15, 15, 21, 21, 27, 27, 77, 67, 67, 73, 73, 79, 79, 7, 7, 7, 7, 7, 19, 19, 19, 19, 19, 25, 25, 25, 25, 25, 33, 33, 73, 73, 79, 43, 43, 43, 54, 54, 54, 61, 61, 61, 81, 81, 94, 23, 29, 35, 43, 43, 43, 43, 53, 53, 53, 53, 67, 67, 67, 67, 88, 88, 94, 3, 3, 16, 16, 22, 22, 24, 24, 30, 30, 41, 41, 90, 90, 96, 96, 33, 33, 44, 44, 52, 52, 59, 59, 97, 97, 7, 7, 14, 14, 20, 20, 69, 69, 79, 79, 23, 23, 23, 23, 41, 41, 41, 41, 58, 58, 58, 58, 67, 67, 84, 29, 29, 29, 35, 35, 35, 77, 77, 77, 86, 86, 92, 43, 52, 60, 32, 38, 49, 63, 63, 69, 69, 79, 79, 3, 3, 47, 47, 55, 55, 62, 62, 71, 81, 81, 87, 87, 93, 93, 11, 11, 40, 40, 65, 65, 73, 73, 81, 81, 18, 18, 26, 26, 69, 69, 77, 47, 47, 59, 59, 87, 87, 95, 5, 5, 5, 5, 5, 5, 13, 13, 13, 13, 13, 13, 21, 21, 21, 21, 21, 21, 35, 46, 46, 66, 11, 11, 11, 11, 11, 23, 23, 23, 23, 23, 35, 35, 35, 35, 35, 51, 51, 63, 29, 29, 29, 29, 41, 41, 41, 41, 56, 56, 56, 56, 83, 83, 92, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 49, 49, 49, 49, 49, 49, 49, 49, 63, 63, 63, 63, 70, 70, 80, 7, 7, 13, 13, 45, 45, 51, 51, 63, 27, 27, 27, 27, 27, 27, 28, 28, 38, 39, 39, 39, 39, 39, 39, 39, 57, 57, 57, 57, 57, 57, 57, 57, 75, 75, 75, 75, 75, 75, 75, 75, 85, 85, 85, 85, 91, 91, 97, 3, 3, 3, 3, 3, 3, 3, 3, 15, 15, 15, 15, 15, 15, 15, 15, 31, 31, 31, 31, 31, 31, 31, 32, 47, 47, 47, 47, 47, 47, 64, 64, 64, 64, 71, 71, 81, 7, 7, 7, 19, 19, 19, 31, 31, 31, 42, 42, 48, 48, 82, 25, 25, 25, 25, 25, 37, 37, 37, 37, 37, 53, 53, 53, 53, 53, 59, 59, 59, 59, 89, 89, 95]
+time_of_match=[13, 13, 13, 13, 13, 16, 16, 29, 29, 29, 29, 51, 51, 63, 16, 16, 16, 19, 19, 19, 19, 19, 37, 37, 37, 37, 51, 51, 67, 37, 48, 48, 48, 48, 67, 67, 75, 26, 26, 26, 45, 45, 45, 45, 63, 63, 75, 41, 41, 55, 55, 55, 55, 58, 58, 58, 58, 71, 71, 71, 71, 79, 79, 85, 5, 5, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 15, 15, 15, 15, 15, 23, 23, 23, 23, 23, 23, 23, 23, 29, 29, 29, 29, 51, 51, 62, 1, 1, 1, 1, 17, 17, 17, 17, 17, 17, 17, 17, 24, 24, 24, 24, 30, 30, 50, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 46, 46, 46, 46, 46, 46, 46, 46, 66, 66, 66, 66, 76, 76, 82, 60, 60, 60, 60, 60, 60, 66, 66, 66, 66, 75, 75, 82, 42, 42, 42, 42, 42, 56, 56, 56, 56, 70, 70, 86, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 22, 22, 22, 22, 22, 22, 22, 22, 28, 28, 28, 28, 50, 50, 63, 7, 7, 7, 7, 19, 19, 19, 19, 27, 27, 50, 18, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 38, 38, 38, 38, 38, 38, 38, 38, 49, 49, 49, 49, 59, 59, 73, 38, 48, 48, 48, 48, 48, 48, 48, 48, 58, 58, 58, 58, 64, 64, 73, 43, 43, 43, 43, 43, 43, 43, 54, 54, 54, 54, 54, 54, 54, 54, 69, 69, 69, 69, 79, 79, 86, 3, 3, 3, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 21, 21, 21, 21, 21, 21, 21, 21, 29, 29, 29, 29, 51, 51, 62, 1, 1, 1, 1, 7, 7, 19, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 41, 41, 41, 41, 41, 41, 41, 41, 56, 56, 56, 56, 77, 77, 84, 30, 40, 40, 40, 40, 62, 62, 82, 15, 15, 15, 15, 15, 15, 35, 35, 35, 35, 45, 45, 67]
 schedule = build_schedule(data["class_index"], data["round_index"], time_of_match, list(data["event_colors"].keys()), data)
 print("TIMESLOTS:")
 
@@ -442,7 +469,9 @@ print(f"Total matches from minizinc: {str(len(time_of_match))}")
 total_matches = sum(1 for slot in schedule for match in slot if match.strip())
 print(f"Total matches in schedule: {total_matches}")
 
-write_schedule_to_excel(data["file_path"], schedule, data["event_colors"], "18:00", sheet_name="timetable", start_row=4, start_col=3)
+days_blocks = get_blocks_for_schedule_printing()
+write_schedule_to_excel(file_path=data["file_path"], schedule=schedule, event_colors=data["event_colors"],days_blocks=days_blocks, sheet_name="timetable", start_row=4, start_col=3)
+#write_schedule_to_excel(data["file_path"], schedule, data["event_colors"], "18:00", sheet_name="timetable", start_row=4, start_col=3)
 #write_schedule_to_excel(data["file_path"], schedule, sheet_name="timetable", start_row=4, start_col=4)
 
 print("\n----Done----\n")

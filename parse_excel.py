@@ -564,58 +564,6 @@ def log_rule_violations_to_excel(file_path, rule_violations, sheet_name="Rule Vi
     book.save(file_path)
     print(f"➡️  Appended {len(rule_violations)} rule violations to '{sheet_name}'")
 
-'''
-def half_hour_slots(start_datetime: str, end_datetime: str):
-    """
-    Calculates how many 30-minute slots fit between two times (HH:MM format).
-    Returns an integer count.
-    """
-    datetime_format = "%Y-%m-%d %H:%M"
-    start = datetime.strptime(start_datetime, datetime_format)
-    end = datetime.strptime(end_datetime, datetime_format)
-    
-    if end <= start:
-        raise ValueError("End time must be after start time.")
-    
-    # Calculate total minutes difference
-    slot_length = timedelta(minutes=30)
-    
-    count = 0
-    current = start
-    while current <= end:
-        count += 1
-        current += slot_length
-    
-    return count
-'''
-'''
-def half_hour_slots(start_time: str, end_time: str):
-    """
-    Calculates how many 30-minute slots fit between two times (HH:MM format).
-    Returns an integer count.
-    """
-    time_format = "%H:%M"
-    
-    # These will both default to 1900-01-01
-    start = datetime.strptime(start_time, time_format)
-    end = datetime.strptime(end_time, time_format)
-    
-    # Check if end is before start (assuming same day)
-    if end <= start:
-        print(f"❌ ERROR: End time is before start time! start time: {start_time}, end time: {end_time}. QUITTING!")
-        return -1
-    
-    slot_length = timedelta(minutes=30)
-    
-    count = 0
-    current = start
-    # Using <= means it counts the start time AND the end time
-    while current <= end:
-        count += 1
-        current += slot_length
-    
-    return count
-'''
 
 # Calculates the amount of 15 minute times lots that are in a block
 def start_time_slots(start_time: str, end_time: str) -> int:
@@ -678,6 +626,50 @@ def parse_day_blocks(day_config, day_name: str):
 
     return blocks, day_total_slots
 
+def all_time_blocks():
+    fri_blocks, num_of_slots_day_zero = parse_day_blocks(competition_info.friday, "Friday")
+    sat_blocks, num_of_slots_day_one  = parse_day_blocks(competition_info.saturday, "Saturday")
+    sun_blocks, num_of_slots_day_two  = parse_day_blocks(competition_info.sunday, "Sunday")
+
+    if num_of_slots_day_zero < 0 or num_of_slots_day_one < 0 or num_of_slots_day_two < 0:
+        print("❌ ERROR: The timeslots could not be counted! QUITTING!")
+        return {}
+    
+    all_blocks = fri_blocks + sat_blocks + sun_blocks
+    if not all_blocks:
+        print("❌ ERROR: No active competition days configured! QUITTING!")
+        return {}
+
+    return all_blocks, num_of_slots_day_zero, num_of_slots_day_one, num_of_slots_day_two
+
+def get_blocks_for_schedule_printing():
+    """
+    Builds the block data specifically for the schedule Excel writer.
+    Returns a list of days, where each day is a list of block tuples: 
+    [ [(slots, courts, start_time_str), ...], [(slots, courts, start_time_str)], ... ]
+    """
+    days_blocks = []
+    
+    for day_config in [competition_info.friday, competition_info.saturday, competition_info.sunday]:
+        if not day_config:
+            continue
+            
+        # Normalize to list of lists if it's a flat list
+        if isinstance(day_config[0], str):
+            day_config = [day_config]
+            
+        current_day = []
+        for block in day_config:
+            start_str, end_str, courts = block[0], block[1], int(block[2])
+            slots = start_time_slots(start_str, end_str)
+            if slots > 0:
+                current_day.append((slots, courts, start_str))
+        
+        # Only append the day if it has valid blocks
+        if current_day:
+            days_blocks.append(current_day)
+    return days_blocks
+
 def minizinc_data(print_lists = True):
 
     file_path = competition_info.file_path
@@ -691,66 +683,8 @@ def minizinc_data(print_lists = True):
     event_structures, round_schedules = calculate_tournament_structure(event_players, competition_info.pool)
     event_colors = assign_event_colors(event_players.keys(), color_bank)
 
-    '''
-    # Time slots that can hold matches (15 min)
-    #day_zero = half_hour_slots("2025-10-10 09:00", "2025-10-10 21:00") * 2 - 1 
-    day_zero = 0#half_hour_slots("2025-10-10 18:00", "2025-10-10 21:00") * 2 - 1
-    if competition_info.friday:
-        day_zero = half_hour_slots(competition_info.friday_start_time, competition_info.friday_end_time) * 2 - 1
-
-    day_one = 0
-    if competition_info.saturday:
-        day_one = half_hour_slots(competition_info.saturday_start_time, competition_info.saturday_end_time) * 2 - 1
     
-    day_two_1 = 0#half_hour_slots("2025-10-10 09:00", "2025-10-10 10:00") * 2 - 1
-    if competition_info.sunday_1:
-        day_two_1 = half_hour_slots(competition_info.sunday_start_time_1, competition_info.sunday_end_time_1) * 2 - 1
-
-    day_two_2 = 0#half_hour_slots("2025-10-10 10:30", "2025-10-10 14:00") * 2 - 1
-    if competition_info.sunday_2:
-        day_two_2 = half_hour_slots(competition_info.sunday_start_time_2, competition_info.sunday_end_time_2) * 2 - 1
-
-    day_two_3 = 0#half_hour_slots("2025-10-10 14:30", "2025-10-10 19:00") * 2 - 1
-    if competition_info.sunday_3:
-        day_two_3 = half_hour_slots(competition_info.sunday_start_time_3, competition_info.sunday_end_time_3) * 2 - 1
-
-    if day_zero < 0 or day_one < 0 or day_two_1 < 0 or day_two_2 < 0 or day_two_3 < 0:
-        print("❌ ERROR: the timeslots could not be counted! QUITTING!")
-        return
-
-
-    # The tree different time slots based on how many fields are available
-    timeslots_12_fields = day_zero + day_one + day_two_1
-    timeslots_8_fields = day_two_2
-    timeslots_6_fields = day_two_3
-
-    # amount of fields
-    fields_1 = competition_info.friday_saturday_sunday_1_courts
-    fields_2 = competition_info.sunday_courts_2
-    fields_3 = competition_info.sunday_courts_3
-
-    # amount of matchslots
-    matchslots_1 = timeslots_12_fields * fields_1
-    matchslots_2 = timeslots_8_fields * fields_2
-    matchslots_3 = timeslots_6_fields * fields_3
-
-    # the last slots of day 0 and last of day 1
-    last_of_day0 = day_zero
-    last_of_day1 = (day_zero + day_one)
-
-    '''
-    fri_blocks, num_of_slots_day_zero = parse_day_blocks(competition_info.friday, "Friday")
-    sat_blocks, num_of_slots_day_one  = parse_day_blocks(competition_info.saturday, "Saturday")
-    sun_blocks, num_of_slots_day_two  = parse_day_blocks(competition_info.sunday, "Sunday")
-
-    if num_of_slots_day_zero < 0 or num_of_slots_day_one < 0 or num_of_slots_day_two < 0:
-        print("❌ ERROR: The timeslots could not be counted! QUITTING!")
-        return {}
-    
-    all_blocks = fri_blocks + sat_blocks + sun_blocks
-    if not all_blocks:
-        print("❌ ERROR: No active competition days configured! QUITTING!")
-        return {}
+    all_blocks, num_of_slots_day_zero, num_of_slots_day_one, num_of_slots_day_two = all_time_blocks()
 
     # Dynamic block lists for MiniZinc
     nof_blocks = len(all_blocks)
@@ -1136,6 +1070,8 @@ def minizinc_data(print_lists = True):
         #print(nof_elit_rounds, end="\n\n")
         print("BLOCKS (1 block is timeslots and courts)")
         print(all_blocks, end="\n\n")
+        print("BLOCK TIMESLOTS")
+        print(block_timeslots, end="\n\n")
         print("BLOCK MATCHSLOTS (timeslots * courts)")
         print(block_matchslots, end="\n\n")
 
