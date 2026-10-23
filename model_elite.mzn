@@ -762,7 +762,7 @@ var int: class_span =
 
 solve 
     minimize
-        makespan;
+        (makespan * 1000) + singles_doubles_overlap_penalty;
 /*
 solve :: warm_start(time_of_match, warm_values)
     minimize 
@@ -854,3 +854,57 @@ DET IDEALA (enlight Jori från kouvola):
     För varje nivå
     - all singel före all dubbel och mixed
 */
+
+% -----------------------------------------------------------------------------
+% SINGLES VS DOUBLES/MIXED ORDERING
+% 1. Första rundan av singel spelas före första rundan av dubbel och mixed
+% 2. Sista rundan av singel spelas före sista rundan av dubbel och mixed
+% -----------------------------------------------------------------------------
+
+
+% 1:
+predicate order_first_and_last_rounds(set of int: level_classes) =
+    let {
+        set of int: lvl_singles = level_classes intersect singles_classes;
+        set of int: lvl_doubles = level_classes intersect doubles_classes;
+    } in 
+    forall(c_s in lvl_singles, c_d in lvl_doubles) (
+        % 1. First round of singles before first round of doubles
+        (max_match_time_in_round[min(rounds_in_class[c_s])] < 
+         min_match_time_in_round[min(rounds_in_class[c_d])])
+        /\
+        % 2. Last round (finals) of singles before last round (finals) of doubles
+        (max_match_time_in_round[max(rounds_in_class[c_s])] < 
+         min_match_time_in_round[max(rounds_in_class[c_d])])
+    );
+
+% Apply the constraint to each specific level
+constraint order_first_and_last_rounds(V_classes);
+constraint order_first_and_last_rounds(A_classes);
+constraint order_first_and_last_rounds(B_classes);
+constraint order_first_and_last_rounds(C_classes);
+% constraint order_first_and_last_rounds(junior_classes);
+
+% --- Soft constraint: Minimize overlap between singles and doubles per day ---
+function var int: overlap_penalty(set of int: level_classes) =
+    let {
+        set of int: lvl_singles = level_classes intersect singles_classes;
+        set of int: lvl_doubles = level_classes intersect doubles_classes;
+    } in
+    sum(
+        c_s in lvl_singles,
+        c_d in lvl_doubles,
+        r_s in rounds_in_class[c_s],
+        r_d in rounds_in_class[c_d]
+        where day_of_round[r_s] == day_of_round[r_d]
+    )(
+        % Penalty grows the later singles finishes compared to the doubles start time
+        max(0, max_match_time_in_round[r_s] - min_match_time_in_round[r_d])
+    );
+
+var int: singles_doubles_overlap_penalty = 
+    overlap_penalty(V_classes) + 
+    overlap_penalty(A_classes) + 
+    overlap_penalty(B_classes) + 
+    overlap_penalty(C_classes) + 
+    overlap_penalty(junior_classes);
