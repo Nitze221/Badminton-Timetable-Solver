@@ -15,31 +15,58 @@ int: nof_rounds;
 
 int: nof_V_classes;
 int: nof_A_classes;
+int: nof_B_classes;
+int: nof_C_classes;
 int: nof_junior_classes;
+int: nof_rest_classes;
 
 int: V_start;
 int: V_end;
 int: A_start;
 int: A_end;
+int: B_start;
+int: B_end;
+int: C_start;
+int: C_end;
 int: junior_start;
 int: junior_end;
+int: rest_start;
+int: rest_end;
 
 int: nof_V_rounds;
 int: nof_A_rounds;
+int: nof_B_rounds;
+int: nof_C_rounds;
 int: nof_junior_rounds;
+int: nof_rest_rounds;
 
 int: V_rounds_start;
 int: V_rounds_end;
 int: A_rounds_start;
 int: A_rounds_end;
+int: B_rounds_start;
+int: B_rounds_end;
+int: C_rounds_start;
+int: C_rounds_end;
 int: junior_rounds_start;
 int: junior_rounds_end;
+int: rest_rounds_start;
+int: rest_rounds_end;
 
 int: nof_matches;
 int: nof_V_matches;
 int: nof_A_matches;
+int: nof_B_matches;
+int: nof_C_matches;
 int: nof_junior_matches;
 int: nof_matches_rest;
+
+int: nof_singles_classes;
+int: nof_doubles_classes;
+int: nof_singles_rounds;
+int: nof_doubles_rounds;
+int: nof_singles_matches;
+int: nof_doubles_matches;
 
 int: nof_single_V_classes;
 int: single_V_start;
@@ -81,14 +108,37 @@ int: last_of_day0;
 set of int: all_matches;
 set of int: V_matches;
 set of int: A_matches;
+set of int: B_matches;
+set of int: C_matches;
 set of int: junior_matches;
 set of int: matches_rest;
 
+set of int: V_classes;
+set of int: A_classes;
+set of int: B_classes;
+set of int: C_classes;
+set of int: junior_classes;
+set of int: rest_classes;
+
+set of int: V_rounds;
+set of int: A_rounds;
+set of int: B_rounds;
+set of int: C_rounds;
+set of int: junior_rounds;
+set of int: rest_rounds;
+
+set of int: singles_classes;
+set of int: doubles_classes;
+set of int: singles_rounds;
+set of int: doubles_rounds;
+set of int: singles_matches;
+set of int: doubles_matches;
 
 
 
 
-set of int: Matches = 1..nof_matches; % same as set of int: all_matches; ?????                              ??????????????????????????
+
+set of int: Matches = 1..nof_matches; % same as set of int: all_matches; ?????                               ??????????????????????????
 %set of int: Slots = 1..(timeslots_12_fields+timeslots_8_fields+timeslots_6_fields);
 set of int: Slots = 1..total_timeslots;
 % set of int: Fields_1 = 1..fields;

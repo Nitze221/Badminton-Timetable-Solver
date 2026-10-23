@@ -268,7 +268,10 @@ async def main():
     instance["nof_V_classes"] = data["nof_V_classes"]
     instance["nof_single_V_classes"] = data["nof_single_V_classes"]
     instance["nof_A_classes"] = data["nof_A_classes"]
+    instance["nof_B_classes"] = data["nof_B_classes"]
+    instance["nof_C_classes"] = data["nof_C_classes"]
     instance["nof_junior_classes"] = data["nof_junior_classes"]
+    instance["nof_rest_classes"] = data["nof_rest_classes"]
 
     instance["V_start"] = data["V_start"]
     instance["V_end"] = data["V_end"]
@@ -276,14 +279,23 @@ async def main():
     instance["single_V_end"] = data["single_V_end"]
     instance["A_start"] = data["A_start"]
     instance["A_end"] = data["A_end"]
+    instance["B_start"] = data["B_start"]
+    instance["B_end"] = data["B_end"]
+    instance["C_start"] = data["C_start"]
+    instance["C_end"] = data["C_end"]
     instance["junior_start"] = data["junior_start"]
     instance["junior_end"] = data["junior_end"]
+    instance["rest_start"] = data["rest_start"]
+    instance["rest_end"] = data["rest_end"]
 
 
     instance["nof_V_rounds"] = data["nof_V_rounds"]
     instance["nof_single_V_rounds"] = data["nof_single_V_rounds"]
     instance["nof_A_rounds"] = data["nof_A_rounds"]
+    instance["nof_B_rounds"] = data["nof_B_rounds"]
+    instance["nof_C_rounds"] = data["nof_C_rounds"]
     instance["nof_junior_rounds"] = data["nof_junior_rounds"]
+    instance["nof_rest_rounds"] = data["nof_rest_rounds"]
 
     instance["V_rounds_start"] = data["V_rounds_start"]
     instance["V_rounds_end"] = data["V_rounds_end"]
@@ -291,23 +303,61 @@ async def main():
     instance["single_V_rounds_end"] = data["single_V_rounds_end"]
     instance["A_rounds_start"] = data["A_rounds_start"]
     instance["A_rounds_end"] = data["A_rounds_end"]
+    instance["B_rounds_start"] = data["B_rounds_start"]
+    instance["B_rounds_end"] = data["B_rounds_end"]
+    instance["C_rounds_start"] = data["C_rounds_start"]
+    instance["C_rounds_end"] = data["C_rounds_end"]
     instance["junior_rounds_start"] = data["junior_rounds_start"]
     instance["junior_rounds_end"] = data["junior_rounds_end"]
+    instance["rest_rounds_start"] = data["rest_rounds_start"]
+    instance["rest_rounds_end"] = data["rest_rounds_end"]
 
 
-    instance["all_matches"] = data["matches"]
-    instance["V_matches"] = data["V_matches"]
-    instance["single_V_matches"] = data["single_V_matches"]
-    instance["A_matches"] = data["A_matches"]
-    instance["junior_matches"] = data["junior_matches"]
-    instance["matches_rest"] = data["matches_rest"]
+    instance["all_matches"] = set(data["matches"])
+    instance["V_matches"] = set(data["V_matches"])
+    instance["single_V_matches"] = set(data["single_V_matches"])
+    instance["A_matches"] = set(data["A_matches"])
+    instance["B_matches"] = set(data["B_matches"])
+    instance["C_matches"] = set(data["C_matches"])
+    instance["junior_matches"] = set(data["junior_matches"])
+    instance["matches_rest"] = set(data["matches_rest"])
+
+    instance["V_classes"] = set(data["V_classes"])
+    instance["A_classes"] = set(data["A_classes"])
+    instance["B_classes"] = set(data["B_classes"])
+    instance["C_classes"] = set(data["C_classes"])
+    instance["junior_classes"] = set(data["junior_classes"])
+    instance["rest_classes"] = set(data["rest_classes"])
+
+    instance["V_rounds"] = set(data["V_rounds"])
+    instance["A_rounds"] = set(data["A_rounds"])
+    instance["B_rounds"] = set(data["B_rounds"])
+    instance["C_rounds"] = set(data["C_rounds"])
+    instance["junior_rounds"] = set(data["junior_rounds"])
+    instance["rest_rounds"] = set(data["rest_rounds"])
+
+    instance["singles_classes"] = set(data["singles_classes"])
+    instance["doubles_classes"] = set(data["doubles_classes"])
+    instance["singles_rounds"] = set(data["singles_rounds"])
+    instance["doubles_rounds"] = set(data["doubles_rounds"])
+    instance["singles_matches"] = set(data["singles_matches"])
+    instance["doubles_matches"] = set(data["doubles_matches"])
 
     instance["nof_matches"] = len(data["matches"])
     instance["nof_V_matches"] = len(data["V_matches"])
     instance["nof_single_V_matches"] = len(data["single_V_matches"])
     instance["nof_A_matches"] = len(data["A_matches"])
+    instance["nof_B_matches"] = len(data["B_matches"])
+    instance["nof_C_matches"] = len(data["C_matches"])
     instance["nof_junior_matches"] = len(data["junior_matches"])
     instance["nof_matches_rest"] = len(data["matches_rest"])
+
+    instance["nof_singles_classes"] = len(data["singles_classes"])
+    instance["nof_doubles_classes"] = len(data["doubles_classes"])
+    instance["nof_singles_rounds"] = len(data["singles_rounds"])
+    instance["nof_doubles_rounds"] = len(data["doubles_rounds"])
+    instance["nof_singles_matches"] = len(data["singles_matches"])
+    instance["nof_doubles_matches"] = len(data["doubles_matches"])
 
     instance["warm_values"] = [15, 15, 18, 18, 18, 18, 18, 41, 41, 41, 41, 58, 58, 70, 26, 26, 26, 26, 26, 29, 29, 29, 44, 44, 44, 44, 62, 62, 78, 37, 47, 47, 47, 47, 62, 62, 79, 15, 15, 15, 37, 37, 37, 37, 58, 58, 70, 33, 33, 51, 51, 51, 54, 54, 54, 54, 54, 66, 66, 66, 66, 74, 74, 83, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 28, 28, 28, 29, 29, 30, 30, 30, 42, 42, 42, 42, 58, 58, 77, 26, 26, 26, 26, 40, 40, 40, 40, 40, 40, 40, 40, 48, 48, 48, 48, 61, 61, 77, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 21, 21, 21, 21, 21, 21, 21, 21, 36, 36, 36, 36, 46, 46, 62, 17, 17, 17, 17, 17, 17, 30, 30, 30, 30, 44, 44, 57, 52, 52, 52, 52, 52, 66, 66, 66, 66, 72, 72, 81, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 28, 28, 28, 28, 29, 29, 29, 29, 43, 43, 43, 43, 59, 59, 79, 41, 41, 41, 41, 48, 48, 48, 48, 59, 59, 78, 18, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 39, 39, 39, 39, 39, 39, 39, 39, 49, 49, 49, 49, 55, 55, 70, 1, 19, 19, 19, 19, 19, 19, 19, 19, 37, 37, 37, 37, 55, 55, 70, 33, 33, 33, 33, 33, 33, 33, 50, 50, 50, 50, 50, 50, 50, 50, 65, 65, 65, 65, 74, 74, 83, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 21, 21, 21, 21, 21, 21, 21, 21, 27, 27, 27, 27, 42, 42, 58, 60, 60, 60, 60, 71, 71, 77, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 35, 35, 35, 35, 35, 35, 35, 35, 46, 46, 46, 46, 62, 62, 76, 3, 17, 17, 17, 17, 26, 26, 46, 31, 31, 31, 31, 31, 31, 52, 52, 52, 52, 67, 67, 81]
 

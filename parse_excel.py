@@ -818,12 +818,39 @@ def minizinc_data(print_lists = True):
     V_matches = []
     single_V_matches = []
     A_matches = []
+    B_matches = []
+    C_matches = []
     junior_matches = []
     matches_rest = []
+
+    V_classes = []
+    A_classes = []
+    B_classes = []
+    C_classes = []
+    junior_classes = []
+    rest_classes = []
+
+    V_rounds = []
+    A_rounds = []
+    B_rounds = []
+    C_rounds = []
+    junior_rounds = []
+    rest_rounds = []
+
+    singles_classes = []
+    doubles_classes = []
+    singles_rounds = []
+    doubles_rounds = []
+    singles_matches = []
+    doubles_matches = []
+
     is_elite_match = False
     is_single_V_match = False
     is_A_match = False
+    is_B_match = False
+    is_C_match = False
     is_junior_match = False
+    is_singles = False
     class_index = []
     round_index = []
     first_singles_round_M = []
@@ -836,6 +863,8 @@ def minizinc_data(print_lists = True):
     nof_V_classes = 0
     nof_single_V_classes = 0
     nof_A_classes = 0
+    nof_B_classes = 0
+    nof_C_classes = 0
     nof_junior_classes = 0
     nof_rest_classes = 0
 
@@ -851,13 +880,20 @@ def minizinc_data(print_lists = True):
         # 2. Check for A classes (ending with A)
         elif event_name.endswith("A"):
             nof_A_classes += 1
+
+        # 3. Check for B classes (ending with B)
+        elif event_name.endswith("B"):
+            nof_B_classes += 1
+
+        # 4. Check for C classes (ending with C)
+        elif event_name.endswith("C"):
+            nof_C_classes += 1
             
-        # 3. Check for Junior classes (containing U9, U11, or U13)
-        # Using 'in' is safer here in case the name is 'BS U13' or 'BS U13 '
-        elif any(jr in event_name for jr in ["U9", "U11", "U13"]):
+        # 5. Check for Junior classes (containing U9, U11, or U13, or ending with 9, 11, 13)
+        elif any(jr in event_name for jr in ["U9", "U11", "U13"]) or any(event_name.endswith(s) for s in ["9", "11", "13"]):
             nof_junior_classes += 1
             
-        # 4. Everything else
+        # 6. Everything else
         else:
             nof_rest_classes += 1
     
@@ -866,13 +902,19 @@ def minizinc_data(print_lists = True):
     V_range = {"start": 0, "end": 0}
     single_V_range = {"start": 0, "end": 0}
     A_range = {"start": 0, "end": 0}
+    B_range = {"start": 0, "end": 0}
+    C_range = {"start": 0, "end": 0}
     junior_range = {"start": 0, "end": 0}
+    rest_range = {"start": 0, "end": 0}
 
     # Initialize index trackers for when the special rounds start and end
     V_rounds_range = {"start": 0, "end": 0}
     single_V_rounds_range = {"start": 0, "end": 0}
     A_rounds_range = {"start": 0, "end": 0}
+    B_rounds_range = {"start": 0, "end": 0}
+    C_rounds_range = {"start": 0, "end": 0}
     junior_rounds_range = {"start": 0, "end": 0}
+    rest_rounds_range = {"start": 0, "end": 0}
 
     count = 1
     class_nr = 1
@@ -883,14 +925,25 @@ def minizinc_data(print_lists = True):
         is_elite_match = False
         is_single_V_match = False
         is_A_match = False
+        is_B_match = False
+        is_C_match = False
         is_junior_match = False
+        is_singles = False
 
         class_index.append(count)
 
         current_event_name = number_event_dict[class_nr]
+        event_prefix = current_event_name.split()[0] if current_event_name else ""
+
+        if "S" in event_prefix:
+            is_singles = True
+            singles_classes.append(class_nr)
+        else:
+            doubles_classes.append(class_nr)
 
         if current_event_name.endswith("V"):
             is_elite_match = True
+            V_classes.append(class_nr)
             if V_range["start"] == 0: V_range["start"] = class_nr
             V_range["end"] = class_nr
             if "S" in current_event_name:
@@ -900,39 +953,87 @@ def minizinc_data(print_lists = True):
 
         elif current_event_name.endswith("A"):
             is_A_match = True
+            A_classes.append(class_nr)
             if A_range["start"] == 0: A_range["start"] = class_nr
             A_range["end"] = class_nr
 
-        elif any(current_event_name.endswith(s) for s in ["9", "11", "13"]):
+        elif current_event_name.endswith("B"):
+            is_B_match = True
+            B_classes.append(class_nr)
+            if B_range["start"] == 0: B_range["start"] = class_nr
+            B_range["end"] = class_nr
+
+        elif current_event_name.endswith("C"):
+            is_C_match = True
+            C_classes.append(class_nr)
+            if C_range["start"] == 0: C_range["start"] = class_nr
+            C_range["end"] = class_nr
+
+        elif any(current_event_name.endswith(s) for s in ["9", "11", "13"]) or any(jr in current_event_name for jr in ["U9", "U11", "U13"]):
             is_junior_match = True
+            junior_classes.append(class_nr)
             if junior_range["start"] == 0: junior_range["start"] = class_nr
             junior_range["end"] = class_nr
+
+        else:
+            rest_classes.append(class_nr)
+            if rest_range["start"] == 0: rest_range["start"] = class_nr
+            rest_range["end"] = class_nr
         
         for inner in outer:
             # --- Round Tracking Logic ---
+            if is_singles:
+                singles_rounds.append(round_counter)
+            else:
+                doubles_rounds.append(round_counter)
+
             if is_elite_match:
+                V_rounds.append(round_counter)
                 if V_rounds_range["start"] == 0: V_rounds_range["start"] = round_counter
                 V_rounds_range["end"] = round_counter
                 if is_single_V_match:
                     if single_V_rounds_range["start"] == 0: single_V_rounds_range["start"] = round_counter
                     single_V_rounds_range["end"] = round_counter
             elif is_A_match:
+                A_rounds.append(round_counter)
                 if A_rounds_range["start"] == 0: A_rounds_range["start"] = round_counter
                 A_rounds_range["end"] = round_counter
+            elif is_B_match:
+                B_rounds.append(round_counter)
+                if B_rounds_range["start"] == 0: B_rounds_range["start"] = round_counter
+                B_rounds_range["end"] = round_counter
+            elif is_C_match:
+                C_rounds.append(round_counter)
+                if C_rounds_range["start"] == 0: C_rounds_range["start"] = round_counter
+                C_rounds_range["end"] = round_counter
             elif is_junior_match:
+                junior_rounds.append(round_counter)
                 if junior_rounds_range["start"] == 0: junior_rounds_range["start"] = round_counter
                 junior_rounds_range["end"] = round_counter
+            else:
+                rest_rounds.append(round_counter)
+                if rest_rounds_range["start"] == 0: rest_rounds_range["start"] = round_counter
+                rest_rounds_range["end"] = round_counter
 
             round_counter += 1
 
             round_index.append(count)
             for _ in range(0, inner):
+                if is_singles:
+                    singles_matches.append(count)
+                else:
+                    doubles_matches.append(count)
+
                 if is_elite_match:
                     V_matches.append(count)
                     if is_single_V_match:
                         single_V_matches.append(count)
                 elif is_A_match:
                     A_matches.append(count)
+                elif is_B_match:
+                    B_matches.append(count)
+                elif is_C_match:
+                    C_matches.append(count)
                 elif is_junior_match:
                     junior_matches.append(count)
                 else:
@@ -947,7 +1048,10 @@ def minizinc_data(print_lists = True):
         ("V", V_range, nof_V_classes),
         ("Single V", single_V_range, nof_single_V_classes),
         ("A", A_range, nof_A_classes),
-        ("Junior", junior_range, nof_junior_classes)
+        ("B", B_range, nof_B_classes),
+        ("C", C_range, nof_C_classes),
+        ("Junior", junior_range, nof_junior_classes),
+        ("Rest", rest_range, nof_rest_classes)
     ]
 
     for label, r, expected in validations:
@@ -958,10 +1062,13 @@ def minizinc_data(print_lists = True):
     # --- Validation Logic ---
     
     # number of rounds for the special classes
-    nof_junior_rounds = sum(len(arr) for arr in elimination_data_minizinc[junior_range["start"]-1 : junior_range["end"]])
-    nof_V_rounds = sum(len(arr) for arr in elimination_data_minizinc[V_range["start"]-1 : V_range["end"]])
-    nof_single_V_rounds = sum(len(arr) for arr in elimination_data_minizinc[single_V_range["start"]-1 : single_V_range["end"]])
-    nof_A_rounds = sum(len(arr) for arr in elimination_data_minizinc[A_range["start"]-1 : A_range["end"]])
+    nof_junior_rounds = len(junior_rounds)
+    nof_V_rounds = len(V_rounds)
+    nof_single_V_rounds = sum(len(arr) for arr in elimination_data_minizinc[single_V_range["start"]-1 : single_V_range["end"]]) if single_V_range["start"] != 0 else 0
+    nof_A_rounds = len(A_rounds)
+    nof_B_rounds = len(B_rounds)
+    nof_C_rounds = len(C_rounds)
+    nof_rest_rounds = len(rest_rounds)
     
     if print_lists:
         print("NUMBER OF V EVENTS:")
@@ -970,6 +1077,10 @@ def minizinc_data(print_lists = True):
         print(nof_single_V_classes, end='\n')
         print("NUMBER OF A EVENTS:")
         print(nof_A_classes, end='\n')
+        print("NUMBER OF B EVENTS:")
+        print(nof_B_classes, end='\n')
+        print("NUMBER OF C EVENTS:")
+        print(nof_C_classes, end='\n')
         print("NUMBER OF JUNIOR (U9, U11, U13) EVENTS:")
         print(nof_junior_classes, end='\n')
 
@@ -982,8 +1093,14 @@ def minizinc_data(print_lists = True):
         print(nof_single_V_rounds, end='\n')
         print("NUMBER OF A ROUNDS:")
         print(nof_A_rounds, end='\n')
+        print("NUMBER OF B ROUNDS:")
+        print(nof_B_rounds, end='\n')
+        print("NUMBER OF C ROUNDS:")
+        print(nof_C_rounds, end='\n')
         print("NUMBER OF JUNIOR (U9, U11, U13) ROUNDS:")
-        print(nof_junior_rounds, end='\n\n')
+        print(nof_junior_rounds, end='\n')
+        print("NUMBER OF REMAINING ROUNDS:")
+        print(nof_rest_rounds, end='\n\n')
 
         print("\n\n")
 
@@ -1046,7 +1163,10 @@ def minizinc_data(print_lists = True):
         "nof_V_classes": nof_V_classes,
         "nof_single_V_classes": nof_single_V_classes,
         "nof_A_classes": nof_A_classes,
+        "nof_B_classes": nof_B_classes,
+        "nof_C_classes": nof_C_classes,
         "nof_junior_classes": nof_junior_classes,
+        "nof_rest_classes": nof_rest_classes,
 
         "V_start": V_range["start"],
         "V_end": V_range["end"],
@@ -1054,13 +1174,22 @@ def minizinc_data(print_lists = True):
         "single_V_end": single_V_range["end"],
         "A_start": A_range["start"],
         "A_end": A_range["end"],
+        "B_start": B_range["start"],
+        "B_end": B_range["end"],
+        "C_start": C_range["start"],
+        "C_end": C_range["end"],
         "junior_start": junior_range["start"],
         "junior_end": junior_range["end"],
+        "rest_start": rest_range["start"],
+        "rest_end": rest_range["end"],
 
         "nof_V_rounds": nof_V_rounds,
         "nof_single_V_rounds": nof_single_V_rounds,
         "nof_A_rounds": nof_A_rounds,
+        "nof_B_rounds": nof_B_rounds,
+        "nof_C_rounds": nof_C_rounds,
         "nof_junior_rounds": nof_junior_rounds,
+        "nof_rest_rounds": nof_rest_rounds,
 
         "V_rounds_start": V_rounds_range["start"],
         "V_rounds_end": V_rounds_range["end"],
@@ -1068,15 +1197,44 @@ def minizinc_data(print_lists = True):
         "single_V_rounds_end": single_V_rounds_range["end"],
         "A_rounds_start": A_rounds_range["start"],
         "A_rounds_end": A_rounds_range["end"],
+        "B_rounds_start": B_rounds_range["start"],
+        "B_rounds_end": B_rounds_range["end"],
+        "C_rounds_start": C_rounds_range["start"],
+        "C_rounds_end": C_rounds_range["end"],
         "junior_rounds_start": junior_rounds_range["start"],
         "junior_rounds_end": junior_rounds_range["end"],
+        "rest_rounds_start": rest_rounds_range["start"],
+        "rest_rounds_end": rest_rounds_range["end"],
         
         "matches": matches_minizic,
         "V_matches": V_matches,
         "single_V_matches": single_V_matches,
         "A_matches": A_matches,
+        "B_matches": B_matches,
+        "C_matches": C_matches,
         "junior_matches": junior_matches,
         "matches_rest": matches_rest,
+
+        "V_classes": V_classes,
+        "A_classes": A_classes,
+        "B_classes": B_classes,
+        "C_classes": C_classes,
+        "junior_classes": junior_classes,
+        "rest_classes": rest_classes,
+
+        "V_rounds": V_rounds,
+        "A_rounds": A_rounds,
+        "B_rounds": B_rounds,
+        "C_rounds": C_rounds,
+        "junior_rounds": junior_rounds,
+        "rest_rounds": rest_rounds,
+
+        "singles_classes": singles_classes,
+        "doubles_classes": doubles_classes,
+        "singles_rounds": singles_rounds,
+        "doubles_rounds": doubles_rounds,
+        "singles_matches": singles_matches,
+        "doubles_matches": doubles_matches,
 
         "event_colors": event_colors,
     }
