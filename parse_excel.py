@@ -675,6 +675,32 @@ def minizinc_data(print_lists = True):
     file_path = competition_info.file_path
     umpire_chairs = competition_info.umpire_chairs
 
+    strong_collisions = competition_info.strong_collisions
+    weak_collisions = competition_info.weak_collisions
+    super_weak_collisions = competition_info.super_weak_collisions
+
+    V_round_gap = competition_info.V_round_gap
+    A_round_gap = competition_info.A_round_gap
+    rest_round_gap = competition_info.rest_round_gap
+
+    deciding_U_round_factor = competition_info.deciding_U_round_factor
+    U_big_round_start_duration = competition_info.U_big_round_start_duration
+    U_small_round_start_duration = competition_info.U_small_round_start_duration
+
+    deciding_rest_round_factor = competition_info.deciding_rest_round_factor
+    big_round_start_duration = competition_info.big_class_duration
+    small_round_start_duration = competition_info.small_class_duration
+
+    U_match_duration = competition_info.U_match_duration
+    rest_match_duration = competition_info.rest_match_duration
+
+    deciding_class_factor = competition_info.deciding_class_factor
+    big_class_duration = competition_info.big_class_duration
+    small_class_duration = competition_info.small_class_duration
+    junior_round_gap = competition_info.junior_round_gap
+    max_round_gap = competition_info.max_round_gap
+
+
     event_correlations, event_players, player_events = parse_competition_excel(file_path)
     if not event_correlations and not event_players and not player_events:
         print("❌ ERROR: No data was loaded from the excel (file name likely wrong). QUITTING!")
@@ -1173,6 +1199,33 @@ def minizinc_data(print_lists = True):
         "doubles_matches": doubles_matches,
 
         "event_colors": event_colors,
+
+        "strong_collisions": strong_collisions,
+        "weak_collisions": weak_collisions,
+        "super_weak_collisions": super_weak_collisions,
+    
+        "V_round_gap": V_round_gap,
+        "A_round_gap": A_round_gap,
+        "rest_round_gap": rest_round_gap,
+        "junior_round_gap": junior_round_gap,
+    
+        "deciding_U_round_factor": deciding_U_round_factor,
+        "U_big_round_start_duration": U_big_round_start_duration,
+        "U_small_round_start_duration": U_small_round_start_duration,
+    
+        "deciding_rest_round_factor": deciding_rest_round_factor,
+        "big_round_start_duration": big_round_start_duration,
+        "small_round_start_duration": small_round_start_duration,
+
+    
+        "U_match_duration": U_match_duration,
+        "rest_match_duration": rest_match_duration,
+    
+        "deciding_class_factor": deciding_class_factor,
+        "big_class_duration": big_class_duration,
+        "small_class_duration": small_class_duration,
+        "junior_round_gap": junior_round_gap,
+        "max_round_gap": max_round_gap
     }
 
     return data
