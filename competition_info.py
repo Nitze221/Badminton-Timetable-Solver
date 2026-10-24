@@ -27,48 +27,52 @@ sunday = [
 # upmire chairs
 umpire_chairs = 5
 
+#DONE
 # Strong collision time gap
-4
+strong_collisions = 4
 # Weak collision time gap
-3
+weak_collisions = 3
 # Super weak collision time gap
-2
+super_weak_collisions = 2
 
+#DONE
 # V between rounds gap
-6
+V_round_gap = 6
 # A between rounds gap
-5
+A_round_gap = 6
 # Rest between rounds gap
-5
+rest_round_gap = 6
 # Junior between rounds gap
+junior_round_gap = 6
 
 # The amount of matches in an umpire round needed to get tighter time constraints for the starttime of the matches
-a = 4 # this number should be <= umpire_chairs
+deciding_U_round_factor = 4 # this number should be <= umpire_chairs
 # Max umprire round duration (if there are > a mathces in the round)
-1
+U_big_round_start_duration = 4
 # Max umprire round duration (if there are <= a mathces in the round)
-3
+U_small_round_start_duration = 1
 
 # The amount of matches in a non-umpire round needed to get tighter time constraints for the starttime of the matches
-b = 8 # this number needs be <= max fields
+deciding_rest_round_factor = 6 # this number needs be <= max fields
 # Max non-umpite round duration (if there are > b mathces in the round)
-1
+big_round_start_duration = 3
 # Max non-umpite round duration (if there are <= b mathces in the round)
-3
+small_round_start_duration = 1
 
 # Umpire match duration
-3
+U_match_duration = 3
 # Non-upire match duration
-2
+rest_match_duration = 2
 
 # The amount of rounds in a class needed to get tighter time constraints for the class
-c = 3
+deciding_class_factor = 3
 # In classes with > c rounds: all matches within (rounds * x) timeslots
-x = 20
-# In classes with <= c rounds: all matches within (rounds * y) timeslots
-y = 10
+big_class_duration = 15
+# In classes with <= c rounds: all matches within (y) timeslots
+small_class_duration = 20
 
-
+# Max time between round
+max_round_gap = 24
 
 
 # Pretty print

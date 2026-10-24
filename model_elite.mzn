@@ -79,20 +79,6 @@ int: single_V_rounds_end;
 int: nof_single_V_matches;
 set of int: single_V_matches;
 
-/*
-int: timeslots_12_fields;
-int: timeslots_8_fields;
-int: timeslots_6_fields;
-
-int: fields_1;
-int: fields_2;
-int: fields_3;
-
-int: matchslots_1;
-int: matchslots_2;
-int: matchslots_3;
-*/
-
 int: nof_blocks;
 array[Blocks] of int: block_starts;
 array[Blocks] of int: block_timeslots;
@@ -101,9 +87,6 @@ array[Blocks] of int: block_matchslots;
 
 int: last_of_day1;
 int: last_of_day0;
-
-
-
 
 set of int: all_matches;
 set of int: V_matches;
@@ -133,6 +116,32 @@ set of int: singles_rounds;
 set of int: doubles_rounds;
 set of int: singles_matches;
 set of int: doubles_matches;
+
+int: strong_collisions;
+int: weak_collisions;
+int: super_weak_collisions;
+    
+int: V_round_gap;
+int: A_round_gap;
+int: rest_round_gap;
+int: junior_round_gap;
+    
+int: deciding_U_round_factor;
+int: U_big_round_start_duration;
+int: U_small_round_start_duration;
+    
+int: deciding_rest_round_factor;
+int: big_round_start_duration;
+int: small_round_start_duration;
+
+int: U_match_duration;
+int: rest_match_duration;
+    
+int: deciding_class_factor;
+int: big_class_duration;
+int: small_class_duration;
+
+int: max_round_gap;
 
 
 
@@ -365,29 +374,30 @@ constraint forall(r in Rounds, i in matches_in_round[r]) (
 % junior (x = 75)
 constraint 
     forall(c in junior_start..junior_end, r in junior_rounds_start..junior_rounds_end - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 6
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= junior_round_gap
     );
 
 % V (x = 90)
 constraint 
     forall(c in V_start..V_end, r in V_rounds_start..V_rounds_end - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 6
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= V_round_gap
     );
 
 % A (x = 90)
 constraint 
     forall(c in A_start..A_end, r in A_rounds_start..A_rounds_end - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 6
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= A_round_gap
     );
 
 % rest (x = 90)
 constraint 
     forall(c in (junior_end+1)..(V_start-1), r in (junior_rounds_end+1)..(V_rounds_start-1) - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 6
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= rest_round_gap
     );
+%????????????????????
 constraint 
     forall(c in (A_end+1)..nof_classes, r in (A_rounds_end+1)..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 6
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= rest_round_gap
     );
 % redundant constraint to help pruning
 constraint 
@@ -398,7 +408,7 @@ constraint
 % MAX time between rounds 4 * 6 = 24 = 6 hours
 constraint 
     forall(c in Classes, r in 1..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
-        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) < 24
+        (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) < max_round_gap
     );
 
 %constraint
@@ -424,19 +434,19 @@ constraint
 
 constraint
     forall(r in no_umpire_rounds)(
-        if card(matches_in_round[r]) > 6 then
-            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 3
+        if card(matches_in_round[r]) > deciding_rest_round_factor then
+            (max_match_time_in_round[r] - min_match_time_in_round[r]) < big_round_start_duration
         else
-            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 1
+            (max_match_time_in_round[r] - min_match_time_in_round[r]) < small_round_start_duration
         endif
     );
 
 constraint
     forall(r in umpire_rounds)(
-        if card(matches_in_round[r]) > 4 then % this number must be <= umpire_chairs
-            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 4
+        if card(matches_in_round[r]) > deciding_U_round_factor then % this number must be <= umpire_chairs
+            (max_match_time_in_round[r] - min_match_time_in_round[r]) < U_big_round_start_duration
         else
-            (max_match_time_in_round[r] - min_match_time_in_round[r]) < 1
+            (max_match_time_in_round[r] - min_match_time_in_round[r]) < U_small_round_start_duration
         endif
     );
 
@@ -525,38 +535,22 @@ predicate collisionClassFrontierPerDay(int: c1, int: c2, int: gap) =
 % strong collisions
 constraint
     forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
-       collisionClassFrontierPerDay(strong_collision[i], strong_collision[i+1], 4)
+       collisionClassFrontierPerDay(strong_collision[i], strong_collision[i+1], strong_collisions)
     );
 % weak collision
 constraint
     forall(i in 1..nof_weak_collisions where i mod 2 == 1) (
-        collisionClassFrontierPerDay(weak_collision[i], weak_collision[i+1], 3)
+        collisionClassFrontierPerDay(weak_collision[i], weak_collision[i+1], weak_collisions)
     );
 
 % super weak collision
 constraint
     forall(i in 1..nof_super_weak_collisions where i mod 2 == 1) (
-        collisionClassFrontierPerDay(super_weak_collision[i], super_weak_collision[i+1], 2)
+        collisionClassFrontierPerDay(super_weak_collision[i], super_weak_collision[i+1], super_weak_collisions)
     );
 
-
-
-% Semi-finals and finals on day 2 for V classes
-%constraint
- %   forall(c in V_start..V_end
-  %  )(
-   %     forall(i in matches_in_class[c] where is_semi_or_final(i, c)) (
-    %        time_of_match[i] > last_of_day1
-     %   )
-    %);
-    
-
-
-% switch constraint to domain narrowing
-% Tighten domains of finals in elit classes to be strictly after last_of_day1
-
 % Block any round from beeing split between two days
-% 1 = Day 0 / Friday, 2 = Day 1 / Saturday, 3 = Day 2 / Sunday
+% 1 = Day 1 / Saturday, 2 = Day 2 / Sunday
 set of int: DayIndices = 1..2;
 array[Rounds] of var DayIndices: day_of_round;
 
@@ -569,93 +563,22 @@ constraint forall(r in Rounds)(
 );
 
 
-
-%constraint exists(m in 1..nof_matches)(
- %   time_of_match[m] == last_of_day0 + 1
-%);
-
-
-
 % In classes with <= 3 rounds: all matches within (rounds * 10) timeslots
 constraint
     forall(c in Classes where 
-        card({r | r in Rounds where class_of_match[round_index[r]] == c}) <= 3
+        card({r | r in Rounds where class_of_match[round_index[r]] == c}) <= deciding_class_factor
     )(
-        max_match_time_in_class[c] - min_match_time_in_class[c] + 1 <= 20 % nof_rounds_in_class[c] * 10
+        max_match_time_in_class[c] - min_match_time_in_class[c] + 1 <= small_class_duration % nof_rounds_in_class[c] * 10
     );
 
-% In classes with <= 3 rounds: all matches on the same day, using precomputed min/max
-%constraint
- %   forall(c in 1..nof_classes where 
-  %      card({r | r in 1..nof_rounds where class_of_match[round_index[r]] == c}) <= 3
-   % )(
-    %    (max_match_time_in_class[c] <= last_of_day1)
-     %   xor
-      %  (min_match_time_in_class[c] > last_of_day1)
-    %);
 
-
-
-% In classes with > 3 rounds: all matches within (rounds * 15) timeslots
+% In classes with > 3 rounds: all matches within (rounds * x) timeslots
 constraint
     forall(c in Classes where 
-        card({r | r in Rounds where class_of_match[round_index[r]] == c}) > 3
+        card({r | r in Rounds where class_of_match[round_index[r]] == c}) > deciding_class_factor
     )(
-        max_match_time_in_class[c] - min_match_time_in_class[c] + 1 <= nof_rounds_in_class[c] * 15
+        max_match_time_in_class[c] - min_match_time_in_class[c] + 1 <= nof_rounds_in_class[c] * big_class_duration
     );
-
-
-% Aikataulua laadittaessa kullekin ottelulle tulee varata keskimäärin vähintään 30 minuuttia.
-% All adjecent timeslots can max have field amount of matches
-%constraint
- %   forall(ts in 1..timeslots_12_fields - 1)(
-  %      sum([ bool2int(time_of_match[m] == ts \/ time_of_match[m] == ts + 1)
-   %         | m in 1..nof_matches ]) <= fields_1
-    %);
-%constraint
- %   forall(ts in (timeslots_12_fields+1)..(timeslots_12_fields+timeslots_8_fields) - 1)(
-  %      sum([ bool2int(time_of_match[m] == ts \/ time_of_match[m] == ts + 1)
-   %         | m in 1..nof_matches ]) <= fields_2
-    %);
-%constraint
- %   forall(ts in (timeslots_12_fields+timeslots_8_fields+1)..(timeslots_12_fields+timeslots_8_fields+timeslots_6_fields) - 1)(
-  %      sum([ bool2int(time_of_match[m] == ts \/ time_of_match[m] == ts + 1)
-   %         | m in 1..nof_matches ]) <= fields_3
-    %);
-
-/*
-% --- Global Constants ---
-int: total_max_fields = max([fields_1, fields_2, fields_3]);
-
-Define durations for every match (2 slots = 30 minutes)
-array[Matches] of int: match_durations = [2 | m in Matches];
-array[Matches] of int: court_usage = [1 | m in Matches];
-
-% --- Dummy Tasks to handle variable court availability ---
-We create "Fixed matches" that occupy the courts you don't have.
-
-1. Block out fields when we drop from 12 to 8
-int: dummy_8_start = timeslots_12_fields + 1;
-int: dummy_8_dur = timeslots_8_fields;
-int: dummy_8_req = total_max_fields - fields_2; % e.g., 12 - 8 = 4 courts blocked
-
-% 2. Block out fields when we drop from 8 to 6
-int: dummy_6_start = timeslots_12_fields + timeslots_8_fields + 1;
-int: dummy_6_dur = timeslots_6_fields;
-int: dummy_6_req = total_max_fields - fields_3; % e.g., 12 - 6 = 6 courts blocked
-
-constraint cumulative(
-    [time_of_match[m] | m in Matches] ++ [dummy_8_start, dummy_6_start],
-    match_durations ++ [dummy_8_dur, dummy_6_dur],
-    court_usage ++ [dummy_8_req, dummy_6_req],
-    total_max_fields
-);
-
-array[Matches] of int: durations = [2 | _ in Matches];  % Each match occupies 2 timeslots
-array[Matches] of int: resources = [1 | _ in Matches];
-
-constraint cumulative(time_of_match, durations, resources, fields_1);
-*/
 
 set of int: Blocks = 1..nof_blocks;
 
@@ -666,7 +589,7 @@ int: total_timeslots = sum(block_timeslots);
 % Define durations for every match (2 slots = 30 minutes)
 % Umpire matches take 3 slots (45 min), all other matches take 2 slots (30 min)
 array[Matches] of int: match_durations = [
-    if m in umpire_matches then 3 else 2 endif 
+    if m in umpire_matches then U_match_duration else rest_match_duration endif 
     | m in Matches
 ];
 array[Matches] of int: court_usage = [1 | m in Matches];
@@ -684,34 +607,7 @@ constraint cumulative(
     total_max_fields
 );
 
-% 2 hours = 8 timeslots (the extra rest needed on top of the 12h night gap)
-%int: night_buffer = 8;
-%
-%constraint
- %   forall(c in junior_start..junior_end) (
-  %      let {
-   %         set of int: m_in_c = matches_in_class[c]
-    %    } in (
-     %        % Gap between Day 0 and Day 1
-      %      forall(m0 in m_in_c, m1 in m_in_c where 
-       %         time_of_match[m0] <= last_of_day0 /\ 
-        %        time_of_match[m1] > last_of_day0 /\ time_of_match[m1] <= last_of_day1
-         %   ) (
-                % The distance in slots across the boundary must be >= buffer
-                % Because Day 1 starts immediately after last_of_day0 in the index,
-                % we just need to ensure the slot difference is at least 8.
-          %      time_of_match[m1] - time_of_match[m0] >= night_buffer
-           % )
-            %/\
-            % Gap between Day 1 and Day 2
-            %forall(m1 in m_in_c, m2 in m_in_c where 
-             %   time_of_match[m1] > last_of_day0 /\ time_of_match[m1] <= last_of_day1 /\
-              %  time_of_match[m2] > last_of_day1
-            %) (
-             %   time_of_match[m2] - time_of_match[m1] >= night_buffer
-            %)
-        %)
-    %);
+
 /*
 % --- Lunch Break Configuration ---
 int: lunch_start_slot = 9;  % 11:00
@@ -743,11 +639,6 @@ constraint
         )
     );
 */
-% solve minimize (max(time_of_match) - min(time_of_match)) 
-
-%solve minimize 
- %   ((max(time_of_match) - min(time_of_match)) * 100) 
-  %  + sum(c in 1..nof_classes)(max_match_time_in_class[c] - min_match_time_in_class[c]);
 
 var int: makespan =
     max(time_of_match);
@@ -763,6 +654,7 @@ var int: class_span =
 solve 
     minimize
         (makespan * 1000) + singles_doubles_overlap_penalty;
+
 /*
 solve :: warm_start(time_of_match, warm_values)
     minimize 
@@ -796,7 +688,7 @@ constraint makespan == 83;
 constraint
     cumulative(
         [time_of_match[um] | um in umpire_matches],
-        [3 | um in umpire_matches],      % 3 x 15-minute slots
+        [U_match_duration | um in umpire_matches],      % 3 x 15-minute slots
         [1 | um in umpire_matches],      % Each match uses 1 chair
         umpire_chairs                    % Available umpire chairs
     );
@@ -824,7 +716,9 @@ constraint
         endif
     );
 
-% Jos pelimuodossa on Valio- tai A-luokassa enemmän kuin 16 pelaajaa tai peliparia, kaikkia otteluita ei ilman SSuL:n kilpailutoimintaryhmän myöntämää poikkeuslupaa saa pelata samana päivänä ellei kilpailukutsussa mainita kilpailun olevan yksipäiväisen.
+% Jos pelimuodossa on Valio- tai A-luokassa enemmän kuin 16 pelaajaa tai peliparia, 
+% kaikkia otteluita ei ilman SSuL:n kilpailutoimintaryhmän myöntämää poikkeuslupaa 
+% saa pelata samana päivänä ellei kilpailukutsussa mainita kilpailun olevan yksipäiväisen.
 constraint
     forall(c in (V_start..V_end) union (A_start..A_end) where nof_rounds_in_class[c] > 4)(
         % The class cannot both start and end on Saturday

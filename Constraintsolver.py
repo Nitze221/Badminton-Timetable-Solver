@@ -86,7 +86,7 @@ def build_schedule(class_index, round_index, time_of_match, class_names, data):
 
     return schedule
 
-
+'''
 def write_schedule_to_excel(file_path, schedule, event_colors, days_blocks, sheet_name, start_row, start_col):
     try:
         book = load_workbook(file_path)
@@ -103,11 +103,7 @@ def write_schedule_to_excel(file_path, schedule, event_colors, days_blocks, shee
     sheet = book.create_sheet(sheet_name)
 
     fmt = "%H:%M"
-    '''
-    current_time = datetime.strptime(start_time_str, fmt)
-    end_limit = datetime.strptime("21:00", fmt)
-    '''
-
+    
     current_section_start_row = start_row
     relative_col_offset = 0
     
@@ -201,7 +197,201 @@ def write_schedule_to_excel(file_path, schedule, event_colors, days_blocks, shee
 
     book.save(file_path)
     print(f"➡️  Schedule written dynamically across {len(days_blocks)} days.")
+'''
+def write_schedule_to_excel(file_path, schedule, event_colors, days_blocks, sheet_name, class_names, start_row, start_col):
+    try:
+        book = load_workbook(file_path)
+    except FileNotFoundError:
+        print(f"❌ Error: The file '{file_path}' was not found. Skipping writing the schedule to Excel.")
+        return
 
+    timestamp = datetime.now().strftime("%Y-%m-%d %H-%M-%S")
+    sheet_name = f"{sheet_name} {timestamp}"
+
+    if sheet_name in book.sheetnames:
+        del book[sheet_name]
+    
+    sheet = book.create_sheet(sheet_name)
+
+    fmt = "%H:%M"
+
+    current_section_start_row = start_row
+    relative_col_offset = 0
+    
+    # NEW: Track the lowest row written to and the round times dynamically
+    lowest_row_written = start_row
+    class_round_times = {}  # Format: { "Class Name": { "Round Name": "HH:MM" } }
+
+    day_idx = 0
+    block_idx = 0
+    slots_processed_in_block = 0
+
+    current_time = datetime.strptime(days_blocks[day_idx][block_idx][2], fmt)
+    num_courts = days_blocks[day_idx][block_idx][1]
+    max_courts_current_day = max(b[1] for b in days_blocks[day_idx])
+
+    for i in range(max_courts_current_day):
+        sheet.cell(row=current_section_start_row + i, column=start_col - 1).value = i + 1
+
+    for slot_idx, time_slot in enumerate(schedule):
+        if slots_processed_in_block >= days_blocks[day_idx][block_idx][0]:
+            block_idx += 1
+            slots_processed_in_block = 0
+            
+            if block_idx >= len(days_blocks[day_idx]):
+                current_section_start_row += (max_courts_current_day + 6)
+                day_idx += 1
+                if day_idx >= len(days_blocks):
+                    break 
+                
+                block_idx = 0
+                relative_col_offset = 0
+                max_courts_current_day = max(b[1] for b in days_blocks[day_idx])
+                
+                for i in range(max_courts_current_day):
+                    sheet.cell(row=current_section_start_row + i, column=start_col - 1).value = i + 1
+                    
+            current_time = datetime.strptime(days_blocks[day_idx][block_idx][2], fmt)
+            num_courts = days_blocks[day_idx][block_idx][1]
+            
+        actual_col = start_col + relative_col_offset
+        col_letter = get_column_letter(actual_col)
+        time_str = current_time.strftime(fmt)
+        
+        # 1. Write Time Header
+        sheet.cell(row=current_section_start_row - 1, column=actual_col).value = time_str
+
+        # 2. Write Matches & Extract Round Times
+        for row_idx_offset, match in enumerate(time_slot):
+            if row_idx_offset >= num_courts:
+                break
+                
+            full_match_text = str(match).strip() if match else ""
+            if not full_match_text:
+                continue
+
+            actual_row = current_section_start_row + row_idx_offset
+            cell = sheet.cell(row=actual_row, column=actual_col)
+            cell.value = full_match_text
+
+            lookup_key = full_match_text.split(" -")[0].strip()
+            
+            # --- EXTRACT CLASS AND ROUND TIMES HERE ---
+            if "\n" in full_match_text:
+                class_name, round_name = full_match_text.split("\n", 1)
+            elif " -" in full_match_text:
+                class_name, round_name = full_match_text.split(" -", 1)
+            else:
+                class_name = full_match_text
+                round_name = "Match"
+                
+            class_name = class_name.strip()
+            round_name = round_name.strip()
+
+            if class_name not in class_round_times:
+                class_round_times[class_name] = {}
+            
+            # Dynamically determine the day names
+            total_days = len(days_blocks)
+            if total_days == 3:
+                day_names = ["Fri", "Sat", "Sun"]
+            elif total_days == 2:
+                day_names = ["Sat", "Sun"]
+            elif total_days == 1:
+                day_names = ["Sat"]
+            else:
+                day_names = [f"Day {i+1}" for i in range(total_days)]
+                
+            day_str = day_names[day_idx] if day_idx < len(day_names) else f"Day {day_idx + 1}"
+            time_str_ampm = current_time.strftime("%I:%M %p")
+            
+            if round_name not in class_round_times[class_name]:
+                # Initialize the dictionary to store the day and the counts for each time
+                class_round_times[class_name][round_name] = {"day": day_str, "times": {}}
+            
+            # Increment the count of matches for this specific time slot
+            if time_str_ampm not in class_round_times[class_name][round_name]["times"]:
+                class_round_times[class_name][round_name]["times"][time_str_ampm] = 0
+            class_round_times[class_name][round_name]["times"][time_str_ampm] += 1
+            # ------------------------------------------
+
+            if lookup_key in event_colors:
+                hex_bg, text_choice = event_colors[lookup_key]
+                clean_hex = hex_bg.replace("#", "")
+                cell.fill = PatternFill(start_color=clean_hex, end_color=clean_hex, fill_type="solid")
+                cell.font = Font(color="000000" if text_choice == "black" else "FFFFFF")
+
+        # 3. Add COUNTA Formula
+        first_row = current_section_start_row
+        last_row = current_section_start_row + num_courts - 1
+        last_col_letter = get_column_letter(actual_col + 1)
+        
+        formula_row = last_row + 1
+        formula_cell = sheet.cell(row=formula_row, column=actual_col)
+        formula_cell.value = f"=COUNTA({col_letter}{first_row}:{last_col_letter}{last_row})"
+        
+        # Track the lowest row written
+        if formula_row > lowest_row_written:
+            lowest_row_written = formula_row
+
+        current_time += timedelta(minutes=15)
+        relative_col_offset += 1
+        slots_processed_in_block += 1
+
+
+    # Write Class Round Times (5 rows below the schedule)
+    # =========================================================================
+    summary_start_row = lowest_row_written + 5
+    
+    # Write "Round 1", "Round 2" headers leaving 4 empty columns in between
+    if class_round_times:
+        max_rounds = max(len(rounds) for rounds in class_round_times.values())
+        for i in range(1, max_rounds + 1):
+            # Calculate offset: 1->1, 2->6, 3->10, etc.
+            header_col_offset = ((i - 1) * 5) + 1 
+            header_cell = sheet.cell(row=summary_start_row, column=start_col + header_col_offset)
+            header_cell.value = f"Round {i}"
+            header_cell.font = Font(bold=True)
+    
+    current_summary_row = summary_start_row + 1
+    
+    # Iterate through the provided class_names list to enforce specific ordering
+    for class_name in class_names:
+        if class_name in class_round_times:
+            rounds = class_round_times[class_name]
+            
+            # Write the class name
+            class_cell = sheet.cell(row=current_summary_row, column=start_col)
+            class_cell.value = class_name
+            
+            # Color the class name based on event_colors
+            if class_name in event_colors:
+                hex_bg, text_choice = event_colors[class_name]
+                clean_hex = hex_bg.replace("#", "")
+                class_cell.fill = PatternFill(start_color=clean_hex, end_color=clean_hex, fill_type="solid")
+                class_cell.font = Font(color="000000" if text_choice == "black" else "FFFFFF")
+            
+            # Write each round's formatted times, jumping 4 columns each time
+            col_offset = 1
+            for round_name, round_data in rounds.items():
+                day_str = round_data["day"]
+                times_dict = round_data["times"]
+                
+                # Combine times and counts into: "09:00 AM (2), 10:30 AM (1)"
+                time_strings = [f"{t} ({count})" for t, count in times_dict.items()]
+                joined_times = ", ".join(time_strings)
+                
+                # Final format: "Sat: 09:00 AM (2), 10:30 AM (1)"
+                formatted_output = f"{day_str}: {joined_times}"
+                
+                sheet.cell(row=current_summary_row, column=start_col + col_offset).value = formatted_output
+                col_offset += 5 # Advance by 5 to leave 4 empty columns
+                
+            current_summary_row += 1
+    # =========================================================================
+
+    book.save(file_path)
+    print(f"➡️  Schedule written dynamically across {len(days_blocks)} days.")
 
 
 def print_in_terminal(schedule, start_time_str):
@@ -384,6 +574,32 @@ async def main():
     instance["nof_doubles_rounds"] = len(data["doubles_rounds"])
     instance["nof_singles_matches"] = len(data["singles_matches"])
     instance["nof_doubles_matches"] = len(data["doubles_matches"])
+    instance["strong_collisions"] = data["strong_collisions"]
+    instance["weak_collisions"] = data["weak_collisions"]
+    instance["super_weak_collisions"] = data["super_weak_collisions"]
+
+    instance["V_round_gap"] = data["V_round_gap"]
+    instance["A_round_gap"] = data["A_round_gap"]
+    instance["rest_round_gap"] = data["rest_round_gap"]
+    instance["junior_round_gap"] = data["junior_round_gap"]
+
+    instance["deciding_U_round_factor"] = data["deciding_U_round_factor"]
+    instance["U_big_round_start_duration"] = data["U_big_round_start_duration"]
+    instance["U_small_round_start_duration"] = data["U_small_round_start_duration"]
+
+    instance["deciding_rest_round_factor"] = data["deciding_rest_round_factor"]
+    instance["big_round_start_duration"] = data["big_round_start_duration"]
+    instance["small_round_start_duration"] = data["small_round_start_duration"]
+
+
+    instance["U_match_duration"] = data["U_match_duration"]
+    instance["rest_match_duration"] = data["rest_match_duration"]
+
+    instance["deciding_class_factor"] = data["deciding_class_factor"]
+    instance["big_class_duration"] = data["big_class_duration"]
+    instance["small_class_duration"] = data["small_class_duration"]
+
+    instance["max_round_gap"] = data["max_round_gap"]
 
     instance["warm_values"] = [15, 15, 18, 18, 18, 18, 18, 41, 41, 41, 41, 58, 58, 70, 26, 26, 26, 26, 26, 29, 29, 29, 44, 44, 44, 44, 62, 62, 78, 37, 47, 47, 47, 47, 62, 62, 79, 15, 15, 15, 37, 37, 37, 37, 58, 58, 70, 33, 33, 51, 51, 51, 54, 54, 54, 54, 54, 66, 66, 66, 66, 74, 74, 83, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 28, 28, 28, 29, 29, 30, 30, 30, 42, 42, 42, 42, 58, 58, 77, 26, 26, 26, 26, 40, 40, 40, 40, 40, 40, 40, 40, 48, 48, 48, 48, 61, 61, 77, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 21, 21, 21, 21, 21, 21, 21, 21, 36, 36, 36, 36, 46, 46, 62, 17, 17, 17, 17, 17, 17, 30, 30, 30, 30, 44, 44, 57, 52, 52, 52, 52, 52, 66, 66, 66, 66, 72, 72, 81, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 28, 28, 28, 28, 29, 29, 29, 29, 43, 43, 43, 43, 59, 59, 79, 41, 41, 41, 41, 48, 48, 48, 48, 59, 59, 78, 18, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 39, 39, 39, 39, 39, 39, 39, 39, 49, 49, 49, 49, 55, 55, 70, 1, 19, 19, 19, 19, 19, 19, 19, 19, 37, 37, 37, 37, 55, 55, 70, 33, 33, 33, 33, 33, 33, 33, 50, 50, 50, 50, 50, 50, 50, 50, 65, 65, 65, 65, 74, 74, 83, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 21, 21, 21, 21, 21, 21, 21, 21, 27, 27, 27, 27, 42, 42, 58, 60, 60, 60, 60, 71, 71, 77, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 35, 35, 35, 35, 35, 35, 35, 35, 46, 46, 46, 46, 62, 62, 76, 3, 17, 17, 17, 17, 26, 26, 46, 31, 31, 31, 31, 31, 31, 52, 52, 52, 52, 67, 67, 81]
 
@@ -428,21 +644,21 @@ async def main():
         print_in_terminal(schedule, "09:00")
 
         days_blocks = get_blocks_for_schedule_printing()
-        write_schedule_to_excel(file_path=data["file_path"], schedule=schedule, event_colors=data["event_colors"],days_blocks=days_blocks, sheet_name="timetable", start_row=4, start_col=3)
+        write_schedule_to_excel(file_path=data["file_path"], schedule=schedule, event_colors=data["event_colors"],days_blocks=days_blocks, sheet_name="timetable", class_names=list(data["event_colors"].keys()), start_row=4, start_col=3)
         print("Printed to excel!")
 
     print("\n----Done----\n")
 
-
+'''
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         # This swallows the exit error so you don't see a traceback
         pass
-
-
 '''
+
+
 print("\n\n----Running pre-saved mach times----\n")
 
 data = minizinc_data(False)
@@ -459,7 +675,8 @@ data = minizinc_data(False)
 
 #time_of_match=[11, 21, 21, 21, 21, 27, 27, 33, 33, 37, 43, 49, 37, 43, 49, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 21, 21, 21, 21, 21, 21, 21, 21, 33, 33, 33, 33, 41, 41, 49, 49, 21, 21, 34, 34, 34, 34, 40, 40, 46, 46, 9, 17, 17, 25, 25, 13, 29, 29, 29, 29, 37, 37, 45, 45, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 31, 31, 31, 31, 31, 31, 31, 31, 37, 37, 37, 37, 43, 43, 49, 15, 15, 15, 21, 21, 21, 21, 27, 27, 33, 7, 7, 13, 13, 13, 13, 19, 19, 27, 37, 37, 43, 43, 49, 5, 5, 5, 5, 5, 5, 11, 11, 11, 11, 11, 11, 11, 11, 17, 17, 17, 17, 25, 25, 31, 19, 25, 31, 35, 41, 47, 37, 43, 43, 49]
 #time_of_match=[19, 19, 29, 29, 36, 36, 43, 43, 93, 93, 5, 5, 5, 5, 5, 5, 33, 33, 33, 33, 33, 33, 45, 45, 45, 45, 45, 45, 55, 55, 55, 55, 55, 55, 65, 65, 65, 65, 65, 65, 71, 71, 71, 95, 95, 1, 1, 34, 34, 45, 45, 66, 66, 66, 72, 72, 13, 13, 21, 21, 27, 27, 39, 39, 39, 50, 50, 50, 60, 60, 60, 77, 77, 77, 83, 83, 83, 89, 89, 11, 11, 11, 11, 11, 37, 37, 37, 37, 37, 51, 51, 51, 51, 51, 61, 61, 61, 61, 91, 91, 97, 9, 9, 15, 15, 21, 21, 27, 27, 77, 67, 67, 73, 73, 79, 79, 7, 7, 7, 7, 7, 19, 19, 19, 19, 19, 25, 25, 25, 25, 25, 33, 33, 73, 73, 79, 43, 43, 43, 54, 54, 54, 61, 61, 61, 81, 81, 94, 23, 29, 35, 43, 43, 43, 43, 53, 53, 53, 53, 67, 67, 67, 67, 88, 88, 94, 3, 3, 16, 16, 22, 22, 24, 24, 30, 30, 41, 41, 90, 90, 96, 96, 33, 33, 44, 44, 52, 52, 59, 59, 97, 97, 7, 7, 14, 14, 20, 20, 69, 69, 79, 79, 23, 23, 23, 23, 41, 41, 41, 41, 58, 58, 58, 58, 67, 67, 84, 29, 29, 29, 35, 35, 35, 77, 77, 77, 86, 86, 92, 43, 52, 60, 32, 38, 49, 63, 63, 69, 69, 79, 79, 3, 3, 47, 47, 55, 55, 62, 62, 71, 81, 81, 87, 87, 93, 93, 11, 11, 40, 40, 65, 65, 73, 73, 81, 81, 18, 18, 26, 26, 69, 69, 77, 47, 47, 59, 59, 87, 87, 95, 5, 5, 5, 5, 5, 5, 13, 13, 13, 13, 13, 13, 21, 21, 21, 21, 21, 21, 35, 46, 46, 66, 11, 11, 11, 11, 11, 23, 23, 23, 23, 23, 35, 35, 35, 35, 35, 51, 51, 63, 29, 29, 29, 29, 41, 41, 41, 41, 56, 56, 56, 56, 83, 83, 92, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 49, 49, 49, 49, 49, 49, 49, 49, 63, 63, 63, 63, 70, 70, 80, 7, 7, 13, 13, 45, 45, 51, 51, 63, 27, 27, 27, 27, 27, 27, 28, 28, 38, 39, 39, 39, 39, 39, 39, 39, 57, 57, 57, 57, 57, 57, 57, 57, 75, 75, 75, 75, 75, 75, 75, 75, 85, 85, 85, 85, 91, 91, 97, 3, 3, 3, 3, 3, 3, 3, 3, 15, 15, 15, 15, 15, 15, 15, 15, 31, 31, 31, 31, 31, 31, 31, 32, 47, 47, 47, 47, 47, 47, 64, 64, 64, 64, 71, 71, 81, 7, 7, 7, 19, 19, 19, 31, 31, 31, 42, 42, 48, 48, 82, 25, 25, 25, 25, 25, 37, 37, 37, 37, 37, 53, 53, 53, 53, 53, 59, 59, 59, 59, 89, 89, 95]
-time_of_match=[13, 13, 13, 13, 13, 16, 16, 29, 29, 29, 29, 51, 51, 63, 16, 16, 16, 19, 19, 19, 19, 19, 37, 37, 37, 37, 51, 51, 67, 37, 48, 48, 48, 48, 67, 67, 75, 26, 26, 26, 45, 45, 45, 45, 63, 63, 75, 41, 41, 55, 55, 55, 55, 58, 58, 58, 58, 71, 71, 71, 71, 79, 79, 85, 5, 5, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 15, 15, 15, 15, 15, 23, 23, 23, 23, 23, 23, 23, 23, 29, 29, 29, 29, 51, 51, 62, 1, 1, 1, 1, 17, 17, 17, 17, 17, 17, 17, 17, 24, 24, 24, 24, 30, 30, 50, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 35, 46, 46, 46, 46, 46, 46, 46, 46, 66, 66, 66, 66, 76, 76, 82, 60, 60, 60, 60, 60, 60, 66, 66, 66, 66, 75, 75, 82, 42, 42, 42, 42, 42, 56, 56, 56, 56, 70, 70, 86, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 22, 22, 22, 22, 22, 22, 22, 22, 28, 28, 28, 28, 50, 50, 63, 7, 7, 7, 7, 19, 19, 19, 19, 27, 27, 50, 18, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 38, 38, 38, 38, 38, 38, 38, 38, 49, 49, 49, 49, 59, 59, 73, 38, 48, 48, 48, 48, 48, 48, 48, 48, 58, 58, 58, 58, 64, 64, 73, 43, 43, 43, 43, 43, 43, 43, 54, 54, 54, 54, 54, 54, 54, 54, 69, 69, 69, 69, 79, 79, 86, 3, 3, 3, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 21, 21, 21, 21, 21, 21, 21, 21, 29, 29, 29, 29, 51, 51, 62, 1, 1, 1, 1, 7, 7, 19, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 41, 41, 41, 41, 41, 41, 41, 41, 56, 56, 56, 56, 77, 77, 84, 30, 40, 40, 40, 40, 62, 62, 82, 15, 15, 15, 15, 15, 15, 35, 35, 35, 35, 45, 45, 67]
+time_of_match=[16, 16, 19, 19, 19, 19, 19, 31, 31, 31, 31, 53, 53, 67, 13, 13, 13, 13, 13, 16, 16, 16, 28, 28, 28, 28, 51, 51, 63, 42, 63, 63, 63, 63, 79, 79, 88, 44, 44, 44, 67, 67, 67, 67, 77, 77, 88, 23, 23, 35, 35, 35, 35, 35, 38, 38, 38, 48, 48, 48, 48, 71, 71, 84, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 17, 17, 17, 19, 19, 19, 19, 19, 29, 29, 29, 29, 50, 51, 57, 1, 1, 1, 1, 13, 13, 13, 13, 13, 13, 13, 13, 19, 19, 19, 19, 28, 28, 51, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 61, 61, 61, 61, 61, 61, 61, 61, 75, 75, 75, 75, 81, 81, 87, 57, 57, 57, 57, 59, 59, 65, 65, 65, 65, 77, 77, 87, 33, 33, 33, 33, 33, 39, 39, 39, 39, 49, 49, 70, 1, 1, 5, 5, 5, 5, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 19, 21, 21, 21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 30, 30, 30, 30, 30, 30, 30, 30, 50, 50, 50, 50, 58, 58, 64, 1, 1, 1, 1, 7, 7, 7, 7, 13, 13, 19, 14, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 34, 34, 34, 34, 34, 34, 34, 34, 48, 48, 48, 49, 72, 72, 78, 31, 47, 47, 47, 47, 47, 47, 47, 47, 63, 63, 63, 63, 73, 73, 79, 39, 39, 39, 39, 39, 39, 39, 54, 54, 54, 54, 54, 54, 54, 54, 68, 68, 68, 68, 84, 84, 90, 1, 1, 1, 1, 3, 3, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 17, 17, 17, 17, 17, 17, 17, 17, 23, 23, 23, 23, 31, 31, 51, 15, 15, 15, 15, 22, 24, 31, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 45, 45, 45, 45, 45, 45, 45, 45, 61, 61, 61, 61, 75, 75, 82, 35, 45, 45, 45, 45, 51, 51, 71, 41, 41, 41, 41, 41, 41, 56, 56, 56, 56, 66, 66, 86]
+
 schedule = build_schedule(data["class_index"], data["round_index"], time_of_match, list(data["event_colors"].keys()), data)
 print("TIMESLOTS:")
 
@@ -470,9 +687,8 @@ total_matches = sum(1 for slot in schedule for match in slot if match.strip())
 print(f"Total matches in schedule: {total_matches}")
 
 days_blocks = get_blocks_for_schedule_printing()
-write_schedule_to_excel(file_path=data["file_path"], schedule=schedule, event_colors=data["event_colors"],days_blocks=days_blocks, sheet_name="timetable", start_row=4, start_col=3)
+write_schedule_to_excel(file_path=data["file_path"], schedule=schedule, event_colors=data["event_colors"],days_blocks=days_blocks, sheet_name="timetable", class_names=list(data["event_colors"].keys()), start_row=4, start_col=3)
 #write_schedule_to_excel(data["file_path"], schedule, data["event_colors"], "18:00", sheet_name="timetable", start_row=4, start_col=3)
 #write_schedule_to_excel(data["file_path"], schedule, sheet_name="timetable", start_row=4, start_col=4)
 
 print("\n----Done----\n")
-'''
