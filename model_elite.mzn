@@ -400,10 +400,10 @@ constraint
         (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= rest_round_gap
     );
 % redundant constraint to help pruning
-constraint 
+constraint redundant_constraint(
     forall(c in (1)..nof_classes, r in (1)..nof_rounds - 1 where class_of_match[round_index[r]] == class_of_match[round_index[r + 1]]) (
         (min_match_time_in_round[r + 1] - max_match_time_in_round[r]) >= 0
-    );
+    ));
 
 % MAX time between rounds 4 * 6 = 24 = 6 hours
 constraint 
@@ -562,7 +562,37 @@ constraint forall(r in Rounds)(
     (day_of_round[r] == 2 <-> min_match_time_in_round[r] > last_of_day1)
 );
 
+/*
+constraint
+    forall (c in Classes where card(rounds_in_class[c]) >= 4) (
+        let {
+            var int: rounds_on_sat = sum(r in rounds_in_class[c])(day_of_round[r] == 1),
+            var int: rounds_on_sun = sum(r in rounds_in_class[c])(day_of_round[r] == 2),
+        } in (
+            (rounds_on_sat == 0 \/ rounds_on_sat >= 2)
+            /\ 
+            (rounds_on_sun == 0 \/ rounds_on_sun >= 2)
+        )
+    );
 
+constraint
+    forall (c in Classes where card(rounds_in_class[c]) < 4) (
+        let {
+            var int: rounds_on_sat = sum(r in rounds_in_class[c])(day_of_round[r] == 1),
+            var int: rounds_on_sun = sum(r in rounds_in_class[c])(day_of_round[r] == 2),
+        } in (
+            (rounds_on_sat == 0)
+            \/
+            (rounds_on_sun == 0)
+        )
+    );
+
+*/
+/*
+array[DayIndices, Classes] of var Slots: last_round_of_day
+
+array[DayIndices, Classes] of var Slots: first_round_of_day
+*/
 % In classes with <= 3 rounds: all matches within (rounds * 10) timeslots
 constraint
     forall(c in Classes where 
@@ -651,9 +681,53 @@ var int: morning_gravity =
 var int: class_span =
     sum(c in 1..nof_classes)(max_match_time_in_class[c] - min_match_time_in_class[c]);
 
-solve 
-    minimize
-        (makespan * 1000) + singles_doubles_overlap_penalty;
+var int: late_start_penalty =
+    sum(c in V_classes) (
+        if (min_match_time_in_class[c] >= (last_of_day1 - 11)
+            /\
+            min_match_time_in_class[c] <= last_of_day1)
+        then 
+            150
+        else 
+            0
+        endif
+    )
+    +
+    sum(c in Classes diff V_classes) (
+        if (min_match_time_in_class[c] >= (last_of_day1 - 11)
+            /\
+            min_match_time_in_class[c] <= last_of_day1)
+        then 
+            100
+        else 
+            0
+        endif
+    );
+
+var int: round_distribution_penalty =
+    sum (c in Classes) (
+        let {
+            var int: rounds_on_sat = sum(r in rounds_in_class[c])(day_of_round[r] == 1),
+            var int: rounds_on_sun = sum(r in rounds_in_class[c])(day_of_round[r] == 2),
+            int: class_rounds = card(rounds_in_class[c])
+        } in
+            if class_rounds >= 4 then
+                % Penalize if exactly 1 round is played on either day
+                (if rounds_on_sat == 1 then 100 else 0 endif) +
+                (if rounds_on_sun == 1 then 100 else 0 endif)
+            else
+                % Penalize if a small class is split across both days
+                (if rounds_on_sat > 0 /\ rounds_on_sun > 0 then 100 else 0 endif)
+            endif
+    );
+
+solve :: warm_start(time_of_match, warm_values) 
+    minimize 
+        late_start_penalty * pow(10, 6) 
+        +
+        round_distribution_penalty * pow(10, 3) 
+        +
+        singles_doubles_overlap_penalty;
 
 /*
 solve :: warm_start(time_of_match, warm_values)
@@ -662,9 +736,9 @@ solve :: warm_start(time_of_match, warm_values)
         class_span * pow(10,6)
         +
         morning_gravity;
-
-constraint makespan == 83;
 */
+constraint makespan <= 84;
+
 
 
 % Junnu - Ikäkausiluokissa 13, 11 ja 9 edellisen kilpailupäivän viimeisen ja seuraavan kilpailupäivän ensimmäisen pelin alkamisaikojen välin tulee olla vähintään 14 tuntia.
@@ -697,13 +771,23 @@ constraint
 
 constraint
     let {
-        set of int: v_finals = { m | c in V_start..V_end, m in matches_in_class[c] where is_semi_or_final(m, c) };
+        set of int: v_finals = { m | c in V_classes, m in matches_in_class[c] where is_semi_or_final(m, c) };
     } in (
         forall(m in v_finals) (
             time_of_match[m] > last_of_day1
         )
     );
 
+/*
+constraint
+    let {
+        set of int: rest_finals = { m | c in Classes diff V_classes, m in matches_in_class[c] where is_final(m, c) };
+    } in (
+        forall(m in rest_finals) (
+            time_of_match[m] > last_of_day1
+        )
+    );
+*/
 
 % Valioluokan kaksinpelissä neljännesvälierä-, puolivälierä-, välierä- ja loppuotteluiden alkamisaikojen välillä tulee olla vähintään 3 tuntia (12 * 15 min = 180 min)
 constraint
@@ -766,10 +850,12 @@ predicate order_first_and_last_rounds(set of int: level_classes) =
         % 1. First round of singles before first round of doubles
         (max_match_time_in_round[min(rounds_in_class[c_s])] < 
          min_match_time_in_round[min(rounds_in_class[c_d])])
+        /*
         /\
         % 2. Last round (finals) of singles before last round (finals) of doubles
         (max_match_time_in_round[max(rounds_in_class[c_s])] < 
          min_match_time_in_round[max(rounds_in_class[c_d])])
+        */
     );
 
 % Apply the constraint to each specific level
@@ -802,3 +888,7 @@ var int: singles_doubles_overlap_penalty =
     overlap_penalty(B_classes) + 
     overlap_penalty(C_classes) + 
     overlap_penalty(junior_classes);
+
+
+
+%   THIS MODEL WORKS ONLY FOR COMPETITIONS HELD ON SATURDAY AND SUNDAY

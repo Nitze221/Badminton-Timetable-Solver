@@ -688,8 +688,8 @@ def minizinc_data(print_lists = True):
     U_small_round_start_duration = competition_info.U_small_round_start_duration
 
     deciding_rest_round_factor = competition_info.deciding_rest_round_factor
-    big_round_start_duration = competition_info.big_class_duration
-    small_round_start_duration = competition_info.small_class_duration
+    big_round_start_duration = competition_info.big_round_start_duration
+    small_round_start_duration = competition_info.small_round_start_duration
 
     U_match_duration = competition_info.U_match_duration
     rest_match_duration = competition_info.rest_match_duration
