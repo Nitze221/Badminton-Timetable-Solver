@@ -44,7 +44,7 @@ V_round_gap = 6
 # A between rounds gap
 A_round_gap = 6
 # Rest between rounds gap
-rest_round_gap = 6
+rest_round_gap = 5
 # Junior between rounds gap
 junior_round_gap = 6
 

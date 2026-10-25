@@ -535,7 +535,11 @@ predicate collisionClassFrontierPerDay(int: c1, int: c2, int: gap) =
 % strong collisions
 constraint
     forall(i in 1..nof_strong_collisions where i mod 2 == 1) (
-       collisionClassFrontierPerDay(strong_collision[i], strong_collision[i+1], strong_collisions)
+        if ((strong_collision[i] in V_classes) /\ (strong_collision[i+1] in V_classes)) then
+            collisionClassFrontierPerDay(strong_collision[i], strong_collision[i+1], 5)
+        else
+            collisionClassFrontierPerDay(strong_collision[i], strong_collision[i+1], strong_collisions)
+        endif
     );
 % weak collision
 constraint
@@ -602,10 +606,10 @@ constraint
     );
 
 
-% In classes with > 3 rounds: all matches within (rounds * x) timeslots
+% In non V classes with > 3 rounds: all matches within (rounds * x) timeslots
 constraint
     forall(c in Classes where 
-        card({r | r in Rounds where class_of_match[round_index[r]] == c}) > deciding_class_factor
+        card({r | r in Rounds diff V_rounds where class_of_match[round_index[r]] == c}) > deciding_class_factor
     )(
         max_match_time_in_class[c] - min_match_time_in_class[c] + 1 <= nof_rounds_in_class[c] * big_class_duration
     );
@@ -722,10 +726,12 @@ var int: round_distribution_penalty =
     );
 
 solve :: warm_start(time_of_match, warm_values) 
-    minimize 
-        late_start_penalty * pow(10, 6) 
+    minimize
+        makespan * pow(10, 7)
         +
-        round_distribution_penalty * pow(10, 3) 
+        late_start_penalty * pow(10, 4) 
+        +
+        round_distribution_penalty * pow(10, 2) 
         +
         singles_doubles_overlap_penalty;
 
@@ -737,7 +743,7 @@ solve :: warm_start(time_of_match, warm_values)
         +
         morning_gravity;
 */
-constraint makespan <= 84;
+% constraint makespan <= 86;
 
 
 
