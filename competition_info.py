@@ -28,7 +28,7 @@ sunday = [
 ]
 
 # upmire chairs
-umpire_chairs = 5
+umpire_chairs = 6
 
 #DONE
 # Strong collision time gap

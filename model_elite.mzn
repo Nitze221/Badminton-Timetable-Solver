@@ -725,16 +725,22 @@ var int: round_distribution_penalty =
             endif
     );
 
-solve :: warm_start(time_of_match, warm_values) 
+solve :: warm_start(time_of_match, warm_values)
+      :: int_search(
+                time_of_match, 
+                first_fail, 
+                indomain_min
+            )
     minimize
-        makespan * pow(10, 7)
+        makespan;
+        /* * pow(10, 7)
         +
         late_start_penalty * pow(10, 4) 
         +
         round_distribution_penalty * pow(10, 2) 
         +
         singles_doubles_overlap_penalty;
-
+*/
 /*
 solve :: warm_start(time_of_match, warm_values)
     minimize 
@@ -866,9 +872,9 @@ predicate order_first_and_last_rounds(set of int: level_classes) =
 
 % Apply the constraint to each specific level
 constraint order_first_and_last_rounds(V_classes);
-constraint order_first_and_last_rounds(A_classes);
-constraint order_first_and_last_rounds(B_classes);
-constraint order_first_and_last_rounds(C_classes);
+% constraint order_first_and_last_rounds(A_classes);
+% constraint order_first_and_last_rounds(B_classes);
+% constraint order_first_and_last_rounds(C_classes);
 % constraint order_first_and_last_rounds(junior_classes);
 
 % --- Soft constraint: Minimize overlap between singles and doubles per day ---
